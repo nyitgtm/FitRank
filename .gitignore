@@ -1,0 +1,10 @@
+# Xcode
+# Exclude build artifacts
+build/
+DerivedData/
+xcuserdata/
+
+# Temporary files
+.DS_Store
+*.swp
+*.nib
