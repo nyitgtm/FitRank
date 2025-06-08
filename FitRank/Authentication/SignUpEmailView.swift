@@ -2,17 +2,17 @@
 //  SignInEmailView.swift
 //  FitRank
 //
-//  Created by Navraj Singh on 6/8/25.
+//  Created by Navraj Singh on 6/7/25.
 //
 
 import SwiftUI
 
 @MainActor
-final class SignInEmailViewModel: ObservableObject {
+final class SignUpEmailViewModel: ObservableObject {
     @Published var email = ""
     @Published var password = ""
     
-    func signIn() {
+    func signUp() {
         guard !email.isEmpty, !password.isEmpty else {
             print("No email/pass") //In the future add 8char password etc etc etc
             return
@@ -20,11 +20,9 @@ final class SignInEmailViewModel: ObservableObject {
         
         Task{
             do {
-                let returnedUserData = try await AuthenticationManager.shared.signIn(email: email, password: password)
+                let returnedUserData = try await AuthenticationManager.shared.createUser(email: email, password: password)
                 print(returnedUserData)
             } catch {
-                //Can we handle this better
-                //aye frontend team yall got that 😭
                 print("error")
                 print(error)
             }
@@ -33,9 +31,8 @@ final class SignInEmailViewModel: ObservableObject {
     }
 }
 
-
-struct SignInEmailView: View {
-    @StateObject private var viewModel = SignInEmailViewModel()
+struct SignUpEmailView: View {
+    @StateObject private var viewModel = SignUpEmailViewModel()
     @Binding var showSignInView: Bool
     
     var body: some View {
@@ -51,10 +48,10 @@ struct SignInEmailView: View {
                 .cornerRadius(8)
             
             Button {
-                viewModel.signIn()
+                viewModel.signUp()
                 showSignInView = false
             } label: {
-                Text("Sign In")
+                Text("Sign Up")
                     .font(.headline)
                     .foregroundColor(.black)
                     .frame(height: 50)
@@ -65,10 +62,10 @@ struct SignInEmailView: View {
             Spacer()
         }
         .padding()
-        .navigationTitle("Sign In")
+        .navigationTitle("Sign Up")
     }
 }
 
 #Preview {
-    SignInEmailView(showSignInView: .constant(false))
+    SignUpEmailView(showSignInView: .constant(false))
 }
