@@ -11,10 +11,14 @@ import SwiftUI
 final class SignUpEmailViewModel: ObservableObject {
     @Published var email = ""
     @Published var password = ""
+    @Published var isSignedUp = false
+    @Published var errorMessage: String?
     
     func signUp() {
         guard !email.isEmpty, !password.isEmpty else {
-            print("No email/pass") //In the future add 8char password etc etc etc
+            errorMessage = "Please enter both email and password." //In the future add 8char password etc etc etc
+            //also add like password / emal requirements
+            // make sure email is valid and so is password (8chars, special char, num, etc) whatever u think is appropriate
             return
         }
         
@@ -22,9 +26,11 @@ final class SignUpEmailViewModel: ObservableObject {
             do {
                 let returnedUserData = try await AuthenticationManager.shared.createUser(email: email, password: password)
                 print(returnedUserData)
+                isSignedUp = true // should we redirect them to the homepage or signin page????
+                
             } catch {
-                print("error")
-                print(error)
+                errorMessage = "Sign-Up failed." // hi frontend team please put appropriate signup fail error messages
+                print("Sign-in error: \(error)")
             }
         }
         
@@ -47,9 +53,15 @@ struct SignUpEmailView: View {
                 .background(Color.gray.opacity(0.5))
                 .cornerRadius(8)
             
+            //make this look prettier
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .padding()
+            }
+            
             Button {
                 viewModel.signUp()
-                showSignInView = false
             } label: {
                 Text("Sign Up")
                     .font(.headline)
@@ -63,6 +75,11 @@ struct SignUpEmailView: View {
         }
         .padding()
         .navigationTitle("Sign Up")
+        .onChange(of: viewModel.isSignedUp) {
+            if viewModel.isSignedUp {
+                showSignInView = false
+            }
+        }
     }
 }
 

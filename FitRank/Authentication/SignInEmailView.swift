@@ -11,10 +11,12 @@ import SwiftUI
 final class SignInEmailViewModel: ObservableObject {
     @Published var email = ""
     @Published var password = ""
+    @Published var isSignedIn = false
+    @Published var errorMessage: String?
     
     func signIn() {
         guard !email.isEmpty, !password.isEmpty else {
-            print("No email/pass") //In the future add 8char password etc etc etc
+            errorMessage = "Please enter both email and password." //In the future add 8char password etc etc etc
             return
         }
         
@@ -22,11 +24,14 @@ final class SignInEmailViewModel: ObservableObject {
             do {
                 let returnedUserData = try await AuthenticationManager.shared.signIn(email: email, password: password)
                 print(returnedUserData)
+                isSignedIn = true // can we have some nice message or something or like animation
             } catch {
-                //Can we handle this better
-                //aye frontend team yall got that 😭
+                //these print stuff just for me in the console / can delete later going into prod!!
                 print("error")
                 print(error)
+                // smh im helping front end team
+                errorMessage = "Sign-in failed. Please check your credentials."
+                print("Sign-in error: \(error)")
             }
         }
         
@@ -50,9 +55,15 @@ struct SignInEmailView: View {
                 .background(Color.gray.opacity(0.5))
                 .cornerRadius(8)
             
+            //make this look prettier
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .padding()
+            }
+            
             Button {
                 viewModel.signIn()
-                showSignInView = false
             } label: {
                 Text("Sign In")
                     .font(.headline)
@@ -66,6 +77,11 @@ struct SignInEmailView: View {
         }
         .padding()
         .navigationTitle("Sign In")
+        .onChange(of: viewModel.isSignedIn) {
+            if viewModel.isSignedIn {
+                showSignInView = false
+            }
+        }
     }
 }
 
