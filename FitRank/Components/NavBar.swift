@@ -7,33 +7,87 @@
 
 import SwiftUI
 
-struct NavBar: View {
-    //search up the icons here https://hotpot.ai/free-icons
-    // I put random placeholders for now, but we can change it
-    // also lets switch the order and stuff just in case idk
-    let icons = ["house.fill", "map.fill", "plus.circle.fill", "camera.fill", "person.fill"]
+// Create an Enum for Routes
+enum PageRoute: Identifiable {
+    case home
+    case heatmap
+    case comingSoon
 
-    var body: some View {
-        HStack {
-            ForEach(icons, id: \.self) { icon in
-                Spacer() // Pushes icons apart evenly
-                
-                Image(systemName: icon)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 30, height: 30) // frontend team adjust size here
-                    .foregroundColor(.black) // style the icons idk
-                    .onTapGesture {
-                        //idk maybe we can incorperate something here / just throwing ideas
-                    }
-                
-                Spacer() // Pushes icons apart evenly
-            }
+    var id: String {
+        switch self {
+        case .home: return "home"
+        case .heatmap: return "heatmap"
+        case .comingSoon: return "comingSoon"
         }
-        .padding(.vertical, 10) // Adds some vertical breathing room
-        .background(Color.gray.opacity(0.1)) // Optional: Add background color
     }
 }
+
+struct NavBar: View {
+    @State private var selectedRoute: PageRoute? = nil
+//    Can we pass some variables or not hardcode this as much so we can control the bacground color and opacity
+    // bc we will have this in different areas. @frontend team
+
+    let icons: [(name: String, route: PageRoute)] = [
+        ("house.fill", .home),
+        ("map.fill", .heatmap),
+        ("plus.circle.fill", .comingSoon),
+        ("camera.fill", .comingSoon),
+        ("person.fill", .comingSoon)
+    ]
+
+    var body: some View {
+        NavigationStack {
+            VStack {
+                Text("Main View")
+                    .font(.largeTitle)
+                    .padding()
+
+                Spacer()
+
+                // Navigation Bar
+                HStack {
+                    ForEach(icons, id: \.name) { icon in
+                        Spacer()
+
+                        Image(systemName: icon.name)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 30, height: 30)
+                            .foregroundColor(.black)
+                            .onTapGesture {
+                                selectedRoute = icon.route
+                            }
+
+                        Spacer()
+                    }
+                }
+                .padding(.vertical, 10)
+                .background(Color.gray.opacity(0.1))
+            }
+            // Full screen "redirect"
+            .fullScreenCover(item: $selectedRoute, onDismiss: {
+                selectedRoute = nil
+            }) { route in
+                destinationView(for: route)
+            }
+        }
+    }
+
+    // Route Selector
+    @ViewBuilder
+    func destinationView(for route: PageRoute) -> some View {
+        switch route {
+        case .home:
+            HomePage(showSignInView: .constant(false))
+        case .heatmap:
+            Heatmap()
+        case .comingSoon:
+            Text("COMING SOON")
+        }
+    }
+}
+
+
 
 //#Preview {
 //    NavBar()
