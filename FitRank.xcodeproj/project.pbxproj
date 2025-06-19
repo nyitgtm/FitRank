@@ -37,6 +37,7 @@
 		C38A48872DF3F7BD0064D3C3 /* FitRank.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FitRank.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C38A48952DF3F7BF0064D3C3 /* FitRankTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FitRankTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C38A489F2DF3F7BF0064D3C3 /* FitRankUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FitRankUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C3D82F1D2E049C700090D22F /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/CoreLocation.framework; sourceTree = DEVELOPER_DIR; };
 		C3EBD7E62DF50185005FE241 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -114,6 +115,7 @@
 		C3EBD7FB2DF50873005FE241 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				C3D82F1D2E049C700090D22F /* CoreLocation.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
