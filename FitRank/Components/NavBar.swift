@@ -8,7 +8,7 @@
 import SwiftUI
 
 // Create an Enum for Routes
-enum PageRoute: Identifiable {
+enum PageRoute: Identifiable, Equatable {
     case home
     case heatmap
     case comingSoon
@@ -23,10 +23,8 @@ enum PageRoute: Identifiable {
 }
 
 struct NavBar: View {
-    @State private var selectedRoute: PageRoute? = nil
-//    Can we pass some variables or not hardcode this as much so we can control the bacground color and opacity
-    // bc we will have this in different areas. @frontend team
-
+    @Binding var selectedRoute: PageRoute
+    
     let icons: [(name: String, route: PageRoute)] = [
         ("house.fill", .home),
         ("map.fill", .heatmap),
@@ -36,59 +34,23 @@ struct NavBar: View {
     ]
 
     var body: some View {
-        NavigationStack {
-            VStack {
-                Text("Main View")
-                    .font(.largeTitle)
-                    .padding()
-
+        HStack {
+            ForEach(icons, id: \.name) { icon in
                 Spacer()
-
-                // Navigation Bar
-                HStack {
-                    ForEach(icons, id: \.name) { icon in
-                        Spacer()
-
-                        Image(systemName: icon.name)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 30, height: 30)
-                            .foregroundColor(.black)
-                            .onTapGesture {
-                                selectedRoute = icon.route
-                            }
-
-                        Spacer()
+                
+                Image(systemName: icon.name)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 30, height: 30)
+                    .foregroundColor(selectedRoute == icon.route ? .blue : .black)
+                    .onTapGesture {
+                        selectedRoute = icon.route
                     }
-                }
-                .padding(.vertical, 10)
-                .background(Color.gray.opacity(0.1))
-            }
-            // Full screen "redirect"
-            .fullScreenCover(item: $selectedRoute, onDismiss: {
-                selectedRoute = nil
-            }) { route in
-                destinationView(for: route)
+                
+                Spacer()
             }
         }
-    }
-
-    // Route Selector
-    @ViewBuilder
-    func destinationView(for route: PageRoute) -> some View {
-        switch route {
-        case .home:
-            HomePage(showSignInView: .constant(false))
-        case .heatmap:
-            Heatmap()
-        case .comingSoon:
-            Text("COMING SOON")
-        }
+        .padding(.vertical, 10)
+        .background(Color.gray.opacity(0.1))
     }
 }
-
-
-
-//#Preview {
-//    NavBar()
-//}
