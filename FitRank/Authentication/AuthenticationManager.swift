@@ -6,7 +6,7 @@ struct AuthDataResultModel {
     let email: String?
     let photoURL: String?
     
-    init(user: User) {
+    init(user: FirebaseAuth.User) {
         self.uid = user.uid
         self.email = user.email
         self.photoURL = user.photoURL?.absoluteString

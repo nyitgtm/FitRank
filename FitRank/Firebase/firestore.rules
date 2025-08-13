@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    // User profiles: readable by all signed-in users, writable only by owner
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false; // Users cannot delete their profiles
+    }
+    
+    // Workouts: any user can read published ones, only owner or admin can update/delete
+    match /workouts/{workoutId} {
+      allow read: if true; // Anyone can read published workouts
+      allow create: if request.auth != null;
+      allow update: if request.auth != null &&
+         (request.auth.uid == resource.data.userId ||
+          get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true);
+      allow delete: if request.auth != null &&
+         (request.auth.uid == resource.data.userId ||
+          get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true);
+    }
+    
+    // Ratings: only authenticated users can create, and ensure one per user per workout
+    match /ratings/{ratingId} {
+      allow read: if true;
+      allow create: if request.auth != null &&
+         request.auth.uid == resource.data.userID &&
+         resource.data.value in [1, -1];
+      allow update, delete: if false; // Ratings cannot be modified once created
+    }
+    
+    // Comments: authenticated users can create, owner/admin can delete
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if request.auth != null &&
+         request.auth.uid == resource.data.userID &&
+         resource.data.content.size() > 0 &&
+         resource.data.content.size() <= 500; // Max 500 characters
+      allow update: if request.auth != null && request.auth.uid == resource.data.userID;
+      allow delete: if request.auth != null &&
+         (request.auth.uid == resource.data.userID ||
+          get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true);
+    }
+    
+    // Reports: any authenticated user can create, admin only can update status
+    match /reports/{reportId} {
+      allow read: if request.auth != null &&
+         get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true;
+      allow create: if request.auth != null &&
+         request.auth.uid == resource.data.reporterID &&
+         resource.data.reason.size() > 0 &&
+         resource.data.reason.size() <= 200;
+      allow update: if request.auth != null &&
+         get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true;
+      allow delete: if false; // Reports cannot be deleted
+    }
+    
+    // Gyms: read by all, create/update by admin only
+    match /gyms/{gymId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null &&
+         get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true;
+    }
+    
+    // Team data: read by all, no writes (teams are fixed)
+    match /teams/{teamId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

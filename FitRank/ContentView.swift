@@ -8,14 +8,20 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var userViewModel = UserViewModel()
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world! This is FitRank")
+        Group {
+            if userViewModel.isAuthenticated {
+                TabContainerView()
+            } else {
+                // For now, just show the main app since we're using mock data
+                TabContainerView()
+            }
         }
-        .padding()
+        .onAppear {
+            userViewModel.checkAuthenticationStatus()
+        }
     }
 }
 
