@@ -29,7 +29,7 @@ struct NavBar: View {
         ("house.fill", .home),
         ("map.fill", .heatmap),
         ("plus.circle.fill", .comingSoon),
-        ("camera.fill", .comingSoon),
+        ("person.2.fill", .comingSoon),
         ("person.fill", .comingSoon)
     ]
 
