@@ -37,3 +37,4 @@ struct GymPickerView: View {
 #Preview {
     GymPickerView(selectedGym: .constant("gIlZvXqqfaj3qdCfAUns"))
 }
+

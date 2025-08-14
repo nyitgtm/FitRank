@@ -152,23 +152,20 @@ struct StatCard: View {
 
 struct TeamSectionView: View {
     let team: String
+    @StateObject private var teamRepository = TeamRepository()
     
     private func getTeamColor(_ team: String) -> Color {
-        switch team {
-        case "/teams/0": return Color(hex: "#ff7700") ?? .orange
-        case "/teams/1": return Color(hex: "#007bff") ?? .blue
-        case "/teams/2": return Color(hex: "#6f42c1") ?? .purple
-        default: return .gray
+        if let teamData = teamRepository.getTeam(byReference: team) {
+            return Color(hex: teamData.color) ?? .gray
         }
+        return .gray
     }
     
     private func getTeamName(_ team: String) -> String {
-        switch team {
-        case "/teams/0": return "Killa Gorillaz"
-        case "/teams/1": return "Dark Sharks"
-        case "/teams/2": return "Regal Eagles"
-        default: return "Unknown Team"
+        if let teamData = teamRepository.getTeam(byReference: team) {
+            return teamData.name
         }
+        return "Unknown Team"
     }
     
     var body: some View {
@@ -205,6 +202,11 @@ struct TeamSectionView: View {
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
+        .onAppear {
+            Task {
+                await teamRepository.fetchTeams()
+            }
+        }
     }
 }
 
@@ -360,14 +362,15 @@ struct EditProfileView: View {
 struct TeamSelectionView: View {
     @ObservedObject var userViewModel: UserViewModel
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var teamRepository = TeamRepository()
     
     var body: some View {
         NavigationView {
             List {
-                ForEach(Team.allCases, id: \.self) { team in
+                ForEach(teamRepository.teams, id: \.id) { team in
                     Button {
                         Task {
-                            await userViewModel.updateTeam(team: "/teams/\(team.rawValue)")
+                            await userViewModel.updateTeam(team: "/teams/\(team.id ?? "")")
                             dismiss()
                         }
                     } label: {
@@ -376,12 +379,12 @@ struct TeamSelectionView: View {
                                 .fill(Color(hex: team.color) ?? .gray)
                                 .frame(width: 20, height: 20)
                             
-                            Text(team.displayName)
+                            Text(team.name)
                                 .foregroundColor(.primary)
                             
                             Spacer()
                             
-                            if userViewModel.currentUser?.team == "/teams/\(team.rawValue)" {
+                            if userViewModel.currentUser?.team == "/teams/\(team.id ?? "")" {
                                 Image(systemName: "checkmark")
                                     .foregroundColor(.blue)
                             }
@@ -397,6 +400,11 @@ struct TeamSelectionView: View {
                         dismiss()
                     }
                 }
+            }
+        }
+        .onAppear {
+            Task {
+                await teamRepository.fetchTeams()
             }
         }
     }

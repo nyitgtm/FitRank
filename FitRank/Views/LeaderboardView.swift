@@ -115,6 +115,7 @@ struct LeaderboardRowView: View {
     let rank: Int
     let entry: LeaderboardEntry
     let showTeam: Bool
+    @StateObject private var teamRepository = TeamRepository()
     
     var body: some View {
         HStack(spacing: 16) {
@@ -161,6 +162,11 @@ struct LeaderboardRowView: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .onAppear {
+            Task {
+                await teamRepository.fetchTeams()
+            }
+        }
     }
     
     private var rankColor: Color {
@@ -173,12 +179,10 @@ struct LeaderboardRowView: View {
     }
     
     private func getTeamName(_ team: String) -> String {
-        switch team {
-        case "/teams/0": return "Killa Gorillaz"
-        case "/teams/1": return "Dark Sharks"
-        case "/teams/2": return "Regal Eagles"
-        default: return "Unknown Team"
+        if let teamData = teamRepository.getTeam(byReference: team) {
+            return teamData.name
         }
+        return "Unknown Team"
     }
 }
 

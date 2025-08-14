@@ -32,3 +32,4 @@ struct Comment: Identifiable, Codable {
         return Double(likes - dislikes) / Double(total)
     }
 }
+

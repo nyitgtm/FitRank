@@ -122,22 +122,18 @@ class LeaderboardViewModel: ObservableObject {
     
     // MARK: - Team Management
     
+    // Note: These functions are now deprecated since we're using the Team model
+    // They're kept for backward compatibility but should be removed in favor of
+    // using TeamRepository.getTeam(byReference:) directly
+    
     private func getTeamName(_ teamId: String) -> String {
-        switch teamId {
-        case "/teams/0": return "Killa Gorillaz"
-        case "/teams/1": return "Dark Sharks"
-        case "/teams/2": return "Regal Eagles"
-        default: return "Unknown Team"
-        }
+        // This should be replaced with TeamRepository.getTeam(byReference: teamId)?.name
+        return "Team" // Placeholder
     }
     
     private func getTeamColor(_ teamId: String) -> String {
-        switch teamId {
-        case "/teams/0": return "#ff7700"
-        case "/teams/1": return "#007bff"
-        case "/teams/2": return "#6f42c1"
-        default: return "#666666"
-        }
+        // This should be replaced with TeamRepository.getTeam(byReference: teamId)?.color
+        return "#666666" // Placeholder
     }
 }
 

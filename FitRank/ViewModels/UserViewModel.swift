@@ -51,7 +51,7 @@ class UserViewModel: ObservableObject {
         let defaultUser = User(
             id: userId,
             name: authUser.displayName ?? "User",
-            team: "/teams/\(Team.killa.rawValue)",
+            team: "/teams/0", // Default to first team
             isCoach: false,
             username: generateUniqueUsername(),
             tokens: 0
@@ -135,9 +135,10 @@ class UserViewModel: ObservableObject {
         // try await firebaseService.updateUser(user)
     }
     
-    func selectTeam(_ team: Team) async {
-        await updateTeam(team: "/teams/\(team.rawValue)")
-    }
+    // This function is no longer needed since we're using string references directly
+    // func selectTeam(_ team: Team) async {
+    //     await updateTeam(team: "/teams/\(team.rawValue)")
+    // }
     
     // MARK: - Token Management
     

@@ -45,3 +45,4 @@ enum RatingValue: Int, CaseIterable, Identifiable, Codable {
         }
     }
 }
+

@@ -19,35 +19,5 @@ struct User: Identifiable, Codable, Equatable {
     }
 }
 
-// Team enum for the three fixed teams
-enum Team: String, CaseIterable, Codable, Identifiable {
-    case killa = "0"
-    case dark = "1" 
-    case regal = "2"
-    
-    var id: String { rawValue }
-    
-    var displayName: String {
-        switch self {
-        case .killa: return "Killa Gorillaz"
-        case .dark: return "Dark Sharks"
-        case .regal: return "Regal Eagles"
-        }
-    }
-    
-    var color: String {
-        switch self {
-        case .killa: return "#ff7700" // Orange
-        case .dark: return "#007bff"  // Blue
-        case .regal: return "#6f42c1" // Purple
-        }
-    }
-    
-    var slug: String {
-        switch self {
-        case .killa: return "killa_gorillaz"
-        case .dark: return "dark_sharks"
-        case .regal: return "regal_eagles"
-        }
-    }
-}
+// Team reference - now using the Team model from Firestore
+// The team field stores a reference to a team document

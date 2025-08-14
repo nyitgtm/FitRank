@@ -108,3 +108,4 @@ class RatingViewModel: ObservableObject {
         errorMessage = nil
     }
 }
+

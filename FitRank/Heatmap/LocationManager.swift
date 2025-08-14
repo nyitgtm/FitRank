@@ -1,7 +1,6 @@
 import Foundation
 import CoreLocation
 
-@MainActor
 class LocationManager: NSObject, ObservableObject {
     @Published var userLocation: CLLocationCoordinate2D?
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
@@ -18,10 +17,12 @@ class LocationManager: NSObject, ObservableObject {
         locationManager.requestWhenInUseAuthorization()
         
         // For development, set a mock location (Aneva gym)
-        userLocation = CLLocationCoordinate2D(
-            latitude: 40.75266615909022,
-            longitude: -73.93922240996022
-        )
+        Task { @MainActor in
+            userLocation = CLLocationCoordinate2D(
+                latitude: 40.75266615909022,
+                longitude: -73.93922240996022
+            )
+        }
     }
     
     func requestLocation() {
@@ -32,7 +33,9 @@ class LocationManager: NSObject, ObservableObject {
 extension LocationManager: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.first else { return }
-        userLocation = location.coordinate
+        Task { @MainActor in
+            userLocation = location.coordinate
+        }
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
@@ -40,10 +43,13 @@ extension LocationManager: CLLocationManagerDelegate {
     }
     
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        authorizationStatus = status
-        
-        if status == .authorizedWhenInUse || status == .authorizedAlways {
-            requestLocation()
+        Task { @MainActor in
+            authorizationStatus = status
+            
+            if status == .authorizedWhenInUse || status == .authorizedAlways {
+                requestLocation()
+            }
         }
     }
 }
+

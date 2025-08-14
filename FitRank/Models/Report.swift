@@ -60,3 +60,4 @@ enum ReportStatus: String, CaseIterable, Identifiable, Codable {
         }
     }
 }
+

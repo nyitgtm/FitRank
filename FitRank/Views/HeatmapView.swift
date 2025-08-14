@@ -13,7 +13,9 @@ struct HeatmapView: View {
                 // Map View
                 Map(position: $cameraPosition) {
                     // Gym annotations
+                    let _ = print("Debug: Rendering map with \(gymRepository.gyms.count) gyms")
                     ForEach(gymRepository.gyms, id: \.id) { gym in
+                        let _ = print("Debug: Rendering gym: \(gym.name) at \(gym.location.lat), \(gym.location.lon)")
                         Annotation(gym.name, coordinate: CLLocationCoordinate2D(
                             latitude: gym.location.lat,
                             longitude: gym.location.lon
@@ -27,9 +29,9 @@ struct HeatmapView: View {
                                 // Show team ownership when zoomed in
                                 if isZoomedIn,
                                    let teamId = gym.ownerTeamId,
-                                   teamId != "/teams/0", // Exclude default/unowned
-                                   let team = Team.allCases.first(where: { "/teams/\($0.rawValue)" == teamId }) {
-                                    Text("Owned by \(team.displayName)")
+                                   teamId != "0", // Exclude default/unowned
+                                   let team = gymRepository.getTeam(for: teamId) {
+                                    Text("Owned by \(team.name)")
                                         .font(.caption2)
                                         .fontWeight(.medium)
                                         .foregroundColor(.secondary)
@@ -72,11 +74,40 @@ struct HeatmapView: View {
                     .padding(.top, 60)
                 }
                 
-                // Home button
+                // Home button and debug controls
                 VStack {
                     Spacer()
                     HStack {
                         homeButton
+                        
+                        // Debug button to manually fetch gyms
+                        Button {
+                            zoomToFitAllAnnotations()
+                        } label: {
+                            Image(systemName: "info.circle.fill")
+                                .foregroundColor(.white)
+                                .font(.system(size: 16, weight: .medium))
+                                .padding(12)
+                                .background(Color.orange)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                        }
+                        .padding(.leading, 10)
+                        
+                        // Manual refresh button
+                        Button {
+                            gymRepository.fetchGymsMock()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(.white)
+                                .font(.system(size: 16, weight: .medium))
+                                .padding(12)
+                                .background(Color.green)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                        }
+                        .padding(.leading, 10)
+                        
                         Spacer()
                     }
                 }
@@ -86,11 +117,15 @@ struct HeatmapView: View {
             .navigationBarTitleDisplayMode(.large)
             .onAppear {
                 locationManager.requestLocationPermission()
-                gymRepository.fetchGyms()
+                // Use mock data for development
+                gymRepository.fetchGymsMock()
             }
             .onChange(of: gymRepository.gyms.count) {
                 // Auto-zoom when gyms are loaded
+                print("Debug: Gyms count changed to: \(gymRepository.gyms.count)")
                 if !gymRepository.gyms.isEmpty {
+                    print("Debug: Gyms loaded, auto-zooming in 0.5 seconds")
+                    print("Debug: First gym: \(gymRepository.gyms[0])")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         zoomToFitAllAnnotations()
                     }
@@ -115,14 +150,32 @@ struct HeatmapView: View {
     
     // Helper function to get team color
     func colorForTeam(teamId: String?) -> Color {
-        guard let teamId = teamId else { return .gray }
-        
-        // Use the Team enum from User.swift to get team colors
-        if let team = Team.allCases.first(where: { "/teams/\($0.rawValue)" == teamId }) {
-            return Color(hex: team.color) ?? .gray
+        guard let teamId = teamId,
+              let team = gymRepository.getTeam(for: teamId) else {
+            return .gray
         }
         
-        return .gray
+        // Convert team color string to SwiftUI Color
+        switch team.color.lowercased() {
+        case "green", "#00ff00", "#008000":
+            return .green
+        case "blue", "#0000ff", "#007bff":
+            return .blue
+        case "red", "#ff0000", "#dc3545":
+            return .red
+        case "yellow", "#ffff00", "#ffc107":
+            return .yellow
+        case "orange", "#ffa500", "#fd7e14":
+            return .orange
+        case "purple", "#800080", "#6f42c1":
+            return .purple
+        default:
+            // Try to parse hex color if it's a hex string
+            if team.color.hasPrefix("#") {
+                return Color(hex: team.color) ?? .gray
+            }
+            return .gray
+        }
     }
     
     // Helper to zoom map to fit gyms + user location
@@ -166,16 +219,22 @@ struct HeatmapView: View {
         Button {
             zoomToFitAllAnnotations()
         } label: {
-            Image(systemName: "house.fill")
-                .foregroundColor(.white)
-                .font(.system(size: 16, weight: .medium))
-                .padding(12)
-                .background(Color.blue)
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+            VStack(spacing: 4) {
+                Image(systemName: "house.fill")
+                    .foregroundColor(.white)
+                    .font(.system(size: 18, weight: .medium))
+                Text("Home")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+            }
+            .padding(12)
+            .background(Color.blue)
+            .clipShape(Circle())
+            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
         }
         .padding(.leading, 20)
-        .padding(.bottom, 40)
+        .padding(.bottom, 100)
     }
 }
 
