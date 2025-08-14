@@ -23,6 +23,8 @@ struct TabContainerView: View {
                     Text("COMING SOON")
                         .font(.largeTitle)
                         .foregroundColor(.gray)
+                case .profile:
+                    ProfileView(showSignInView: $showSignInView)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

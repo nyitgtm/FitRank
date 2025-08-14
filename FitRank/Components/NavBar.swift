@@ -12,12 +12,14 @@ enum PageRoute: Identifiable, Equatable {
     case home
     case heatmap
     case comingSoon
+    case profile
 
     var id: String {
         switch self {
         case .home: return "home"
         case .heatmap: return "heatmap"
         case .comingSoon: return "comingSoon"
+        case .profile: return "profile"
         }
     }
 }
@@ -30,7 +32,7 @@ struct NavBar: View {
         ("map.fill", .heatmap),
         ("plus.circle.fill", .comingSoon),
         ("person.2.fill", .comingSoon),
-        ("person.fill", .comingSoon)
+        ("person.fill", .profile)
     ]
 
     var body: some View {
