@@ -8,3 +8,4 @@ struct Team: Identifiable, Codable, Equatable {
     var slug: String // one string representation ex. killa_gorillaz
     var icon: String? // SF Symbol name or icon reference
 }
+

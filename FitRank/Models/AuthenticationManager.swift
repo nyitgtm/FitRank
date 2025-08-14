@@ -6,7 +6,7 @@ struct AuthDataResultModel {
     let email: String?
     let photoURL: String?
     
-    init(user: User) {
+    init(user: FirebaseAuth.User) {
         self.uid = user.uid
         self.email = user.email
         self.photoURL = user.photoURL?.absoluteString
@@ -38,5 +38,13 @@ final class AuthenticationManager {
     
     func signOut() throws -> Void {
         try Auth.auth().signOut()
+    }
+    
+    // Get current authenticated user UID
+    func getCurrentUserUID() throws -> String {
+        guard let user = Auth.auth().currentUser else {
+            throw URLError(.badServerResponse)
+        }
+        return user.uid
     }
 }

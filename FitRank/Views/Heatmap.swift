@@ -182,9 +182,9 @@ struct Heatmap: View {
             locationManager.requestLocationPermission()
             gymRepository.fetchGyms()
         }
-        .onChange(of: gymRepository.gyms.count) {
+        .onChange(of: gymRepository.gyms.count) { _, count in
             // Auto-zoom when gyms are loaded
-            if !gymRepository.gyms.isEmpty {
+            if count > 0 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     zoomToFitAllAnnotations()
                 }
