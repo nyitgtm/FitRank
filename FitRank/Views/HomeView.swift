@@ -9,6 +9,8 @@ struct HomeView: View {
 
     // NEW: use this to push CommunityView when the purple chip is tapped
     @State private var goToCommunity = false
+    @State private var showingCommunity = false
+    @State private var showingNutrition = false   // REPLACED: Now for nutrition
 
     enum WorkoutFilter: String, CaseIterable {
         case all = "All"
@@ -101,15 +103,44 @@ struct HomeView: View {
             .navigationTitle("FitRank")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                // NOTE: removed the leading "Community" button to avoid the white pill
+                // REPLACED: Community button with Nutrition button
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showingNutrition = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "fork.knife")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Nutrition")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [.blue, .purple]),
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(16)
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showingUpload = true } label: {
-                        Image(systemName: "plus.circle.fill").font(.title2)
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
                     }
                 }
             }
         }
         .sheet(isPresented: $showingUpload) { UploadView() }
+        .sheet(isPresented: $showingCommunity) { CommunityView() }
+        // CHANGE THIS ONE LINE ONLY:
+        .sheet(isPresented: $showingNutrition) { NutritionMainView() }  // CHANGED: Now opens Nutrition Hub instead of direct calculator
         .onAppear { workoutViewModel.fetchWorkouts() }
     }
 }
