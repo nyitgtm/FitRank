@@ -6,14 +6,11 @@ struct HomeView: View {
     @StateObject private var userViewModel = UserViewModel()
     @State private var selectedFilter: WorkoutFilter = .all
     @State private var showingUpload = false
-<<<<<<< Updated upstream
 
     // NEW: use this to push CommunityView when the purple chip is tapped
     @State private var goToCommunity = false
-=======
     @State private var showingCommunity = false
     @State private var showingNutrition = false   // REPLACED: Now for nutrition
->>>>>>> Stashed changes
 
     enum WorkoutFilter: String, CaseIterable {
         case all = "All"
@@ -106,9 +103,6 @@ struct HomeView: View {
             .navigationTitle("FitRank")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-<<<<<<< Updated upstream
-                // NOTE: removed the leading "Community" button to avoid the white pill
-=======
                 // REPLACED: Community button with Nutrition button
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -135,7 +129,6 @@ struct HomeView: View {
                     }
                 }
                 
->>>>>>> Stashed changes
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showingUpload = true } label: {
                         Image(systemName: "plus.circle.fill")
@@ -145,12 +138,9 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $showingUpload) { UploadView() }
-<<<<<<< Updated upstream
-=======
         .sheet(isPresented: $showingCommunity) { CommunityView() }
         // CHANGE THIS ONE LINE ONLY:
         .sheet(isPresented: $showingNutrition) { NutritionMainView() }  // CHANGED: Now opens Nutrition Hub instead of direct calculator
->>>>>>> Stashed changes
         .onAppear { workoutViewModel.fetchWorkouts() }
     }
 }
