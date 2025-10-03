@@ -6,7 +6,7 @@ import PhotosUI
 struct CommunityPost: Identifiable, Hashable {
     let id: UUID = UUID()
     var authorName: String
-    var teamTag: String?         // e.g., "NYIT Wolves"
+    var teamTag: String?         // e.g., "Killa Gorilla" / "Dark Sharks" / "Regal Eagle"
     var text: String
     var image: UIImage?
     var likeCount: Int
@@ -139,7 +139,7 @@ enum TeamFilter: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Community View (updated)
+// MARK: - Community View
 
 struct CommunityView: View {
     @StateObject private var vm = CommunityVM()
@@ -182,23 +182,19 @@ struct CommunityView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Corner chip + Filter button
+            // Header: Post + Filter (chip removed)
             HStack {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(teamFilter.accent.opacity(0.8))
-                        .frame(width: 6, height: 6)
-                    Text(teamFilter == .all ? "Community" : teamFilter.rawValue)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(teamFilter.color)
-                .clipShape(Capsule())
-
                 Spacer()
 
+                // Post button (composer)
+                Button {
+                    vm.showComposer = true
+                } label: {
+                    Label("Post", systemImage: "square.and.pencil")
+                        .font(.subheadline)
+                }
+
+                // Filter button (popover)
                 Button {
                     showFilter.toggle()
                 } label: {
@@ -265,15 +261,9 @@ struct CommunityView: View {
                 }
             }
         }
-        .navigationTitle("") // keep navbar visible, no big title
+        .navigationTitle("") // keep navbar visible, no large title
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { vm.showComposer = true } label: {
-                    Image(systemName: "square.and.pencil")
-                }
-            }
-        }
+
         // Composer Sheet
         .sheet(isPresented: $vm.showComposer) {
             NewPostSheet(
@@ -282,6 +272,7 @@ struct CommunityView: View {
                 onPost: vm.publishDraft
             )
         }
+
         // Comments Sheet
         .sheet(item: $commentingPost) { post in
             CommentsSheet(
@@ -582,3 +573,4 @@ struct CommentsSheet: View {
         }
     }
 }
+

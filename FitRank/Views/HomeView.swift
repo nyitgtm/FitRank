@@ -6,14 +6,16 @@ struct HomeView: View {
     @StateObject private var userViewModel = UserViewModel()
     @State private var selectedFilter: WorkoutFilter = .all
     @State private var showingUpload = false
-    @State private var showingCommunity = false   // NEW
+
+    // NEW: use this to push CommunityView when the purple chip is tapped
+    @State private var goToCommunity = false
 
     enum WorkoutFilter: String, CaseIterable {
         case all = "All"
         case following = "Following"
         case team = "Team"
         case trending = "Trending"
-        case community = "Community"   // ✅ no extra space
+        case community = "Community"
 
         var color: Color {
             switch self {
@@ -29,7 +31,16 @@ struct HomeView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Filter tabs
+
+                // Hidden link that pushes the Community page
+                NavigationLink(
+                    destination: CommunityView()
+                        .navigationBarTitleDisplayMode(.inline),
+                    isActive: $goToCommunity
+                ) { EmptyView() }
+                .hidden()
+
+                // Filter tabs (purple Community chip lives here)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
                         ForEach(WorkoutFilter.allCases, id: \.self) { filter in
@@ -39,7 +50,7 @@ struct HomeView: View {
                             ) {
                                 selectedFilter = filter
                                 if filter == .community {
-                                    showingCommunity = true
+                                    goToCommunity = true   // push CommunityView
                                 }
                             }
                         }
@@ -48,7 +59,7 @@ struct HomeView: View {
                 }
                 .padding(.vertical, 12)
 
-                // Your existing feed UI
+                // Workout feed
                 if workoutViewModel.isLoading {
                     Spacer()
                     ProgressView("Loading workouts...")
@@ -60,11 +71,16 @@ struct HomeView: View {
                         Image(systemName: "dumbbell.fill")
                             .font(.system(size: 48))
                             .foregroundColor(.secondary)
+
                         Text("No workouts yet")
                             .font(.title2).fontWeight(.medium)
+                            .foregroundColor(.primary)
+
                         Text("Be the first to upload a workout!")
-                            .font(.body).foregroundColor(.secondary)
+                            .font(.body)
+                            .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
+
                         Button("Upload Workout") { showingUpload = true }
                             .buttonStyle(.borderedProminent)
                     }
@@ -85,9 +101,7 @@ struct HomeView: View {
             .navigationTitle("FitRank")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Community") { showingCommunity = true }   // NEW button
-                }
+                // NOTE: removed the leading "Community" button to avoid the white pill
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showingUpload = true } label: {
                         Image(systemName: "plus.circle.fill").font(.title2)
@@ -96,7 +110,6 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $showingUpload) { UploadView() }
-        .sheet(isPresented: $showingCommunity) { CommunityView() }  // NEW sheet
         .onAppear { workoutViewModel.fetchWorkouts() }
     }
 }
@@ -109,7 +122,8 @@ struct FilterTabView: View {
     var body: some View {
         Button(action: action) {
             Text(filter.rawValue)
-                .font(.subheadline).fontWeight(.medium)
+                .font(.subheadline)
+                .fontWeight(.medium)
                 .foregroundColor(isSelected ? .white : filter.color)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -118,3 +132,4 @@ struct FilterTabView: View {
         }
     }
 }
+
