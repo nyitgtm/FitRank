@@ -1,116 +1,6 @@
 import SwiftUI
 import PhotosUI
 
-// MARK: - Models
-
-struct CommunityPost: Identifiable, Hashable {
-    let id: UUID = UUID()
-    var authorName: String
-    var teamTag: String?         // e.g., "Killa Gorilla" / "Dark Sharks" / "Regal Eagle"
-    var text: String
-    var image: UIImage?
-    var likeCount: Int
-    var commentCount: Int
-    var isLikedByMe: Bool
-    var createdAt: Date
-    var comments: [CommunityComment] = []
-}
-
-struct CommunityComment: Identifiable, Hashable {
-    let id: UUID = UUID()
-    var authorName: String
-    var text: String
-    var createdAt: Date
-}
-
-// MARK: - ViewModel (mock/local)
-
-@MainActor
-final class CommunityVM: ObservableObject {
-    @Published var posts: [CommunityPost] = []
-    @Published var isLoading = false
-    @Published var showComposer = false
-    @Published var draftText = ""
-    @Published var draftImage: UIImage?
-
-    init() { seed() }
-
-    func seed() {
-        posts = [
-            CommunityPost(
-                authorName: "Alex M.",
-                teamTag: "Killa Gorilla",
-                text: "Hit a new squat PR today! 🏋️‍♂️",
-                image: nil,
-                likeCount: 12,
-                commentCount: 3,
-                isLikedByMe: false,
-                createdAt: Date().addingTimeInterval(-3600),
-                comments: [
-                    CommunityComment(authorName: "Priya", text: "Let's gooo! 🔥", createdAt: Date().addingTimeInterval(-3500)),
-                    CommunityComment(authorName: "Ben", text: "Proud of you!", createdAt: Date().addingTimeInterval(-3400))
-                ]
-            ),
-            CommunityPost(
-                authorName: "Jenna",
-                teamTag: "Dark Sharks",
-                text: "Team session at 6pm — bring water & good vibes.",
-                image: UIImage(systemName: "figure.run"),
-                likeCount: 5,
-                commentCount: 1,
-                isLikedByMe: true,
-                createdAt: Date().addingTimeInterval(-7200),
-                comments: [
-                    CommunityComment(authorName: "Sam", text: "See you there!", createdAt: Date().addingTimeInterval(-7100))
-                ]
-            ),
-            CommunityPost(
-                authorName: "Ava",
-                teamTag: "Regal Eagle",
-                text: "Plyo day ✨ Anyone got shoe recs?",
-                image: nil,
-                likeCount: 9,
-                commentCount: 0,
-                isLikedByMe: false,
-                createdAt: Date().addingTimeInterval(-8200)
-            )
-        ]
-    }
-
-    func toggleLike(_ post: CommunityPost) {
-        guard let idx = posts.firstIndex(of: post) else { return }
-        posts[idx].isLikedByMe.toggle()
-        posts[idx].likeCount += posts[idx].isLikedByMe ? 1 : -1
-    }
-
-    func addComment(_ text: String, to post: CommunityPost) {
-        guard let idx = posts.firstIndex(of: post),
-              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        let c = CommunityComment(authorName: "You", text: text, createdAt: Date())
-        posts[idx].comments.append(c)
-        posts[idx].commentCount = posts[idx].comments.count
-    }
-
-    func publishDraft() {
-        let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty || draftImage != nil else { return }
-        let new = CommunityPost(
-            authorName: "You",
-            teamTag: "Team Demo",
-            text: trimmed,
-            image: draftImage,
-            likeCount: 0,
-            commentCount: 0,
-            isLikedByMe: false,
-            createdAt: Date()
-        )
-        posts.insert(new, at: 0)
-        draftText = ""
-        draftImage = nil
-        showComposer = false
-    }
-}
-
 // MARK: - Team Filter
 
 enum TeamFilter: String, CaseIterable, Identifiable {
@@ -124,9 +14,9 @@ enum TeamFilter: String, CaseIterable, Identifiable {
     var color: Color {
         switch self {
         case .all:          return Color.secondary.opacity(0.25)
-        case .killaGorilla: return Color.green.opacity(0.25)   // light green
-        case .darkSharks:   return Color.blue.opacity(0.25)    // light blue
-        case .regalEagle:   return Color.yellow.opacity(0.35)  // light yellow
+        case .killaGorilla: return Color.green.opacity(0.25)
+        case .darkSharks:   return Color.blue.opacity(0.25)
+        case .regalEagle:   return Color.yellow.opacity(0.35)
         }
     }
     var accent: Color {
@@ -142,7 +32,8 @@ enum TeamFilter: String, CaseIterable, Identifiable {
 // MARK: - Community View
 
 struct CommunityView: View {
-    @StateObject private var vm = CommunityVM()
+    // SWAP: we now use the Firebase-backed VM
+    @StateObject private var vm = CommunityVM_Firebase()
     @State private var commentingPost: CommunityPost?
 
     @State private var showFilter = false
@@ -154,24 +45,20 @@ struct CommunityView: View {
     private var filteredPosts: [CommunityPost] {
         var items = vm.posts
 
-        // Team filter
         if teamFilter != .all {
             items = items.filter { $0.teamTag?.localizedCaseInsensitiveContains(teamFilter.rawValue) == true }
         }
 
-        // Search
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return items }
 
         if q.hasPrefix("@") {
             let tag = String(q.dropFirst()).lowercased()
-            // match author or team when using @
             return items.filter {
                 $0.authorName.lowercased().contains(tag) ||
                 ($0.teamTag?.lowercased().contains(tag) ?? false)
             }
         } else {
-            // plain text matches post text OR author name OR team
             return items.filter {
                 $0.text.lowercased().contains(q.lowercased()) ||
                 $0.authorName.lowercased().contains(q.lowercased()) ||
@@ -182,19 +69,15 @@ struct CommunityView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header: Post + Filter (chip removed)
+            // Header
             HStack {
                 Spacer()
-
-                // Post button (composer)
                 Button {
                     vm.showComposer = true
                 } label: {
                     Label("Post", systemImage: "square.and.pencil")
                         .font(.subheadline)
                 }
-
-                // Filter button (popover)
                 Button {
                     showFilter.toggle()
                 } label: {
@@ -261,7 +144,7 @@ struct CommunityView: View {
                 }
             }
         }
-        .navigationTitle("") // keep navbar visible, no large title
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
 
         // Composer Sheet
@@ -273,7 +156,7 @@ struct CommunityView: View {
             )
         }
 
-        // Comments Sheet
+        // Comments Sheet (simple send; live sheet feed can be added later)
         .sheet(item: $commentingPost) { post in
             CommentsSheet(
                 post: post,
@@ -322,7 +205,6 @@ private struct FilterPopover: View {
                     )
                     .contentShape(Rectangle())
                 }
-                // Hover highlight (iPad/macOS pointer). Ignored on iPhone.
                 .onHover { isHovering in
                     hovered = isHovering ? option : nil
                 }
@@ -367,7 +249,6 @@ struct PostCardView: View {
     var likeAction: () -> Void
     var commentAction: () -> Void
 
-    // Map team tag -> chip color
     private var teamColor: Color {
         let tag = post.teamTag?.lowercased() ?? ""
         if tag.contains("killa gorilla") { return .green }
@@ -408,7 +289,7 @@ struct PostCardView: View {
                 Text(post.text).font(.body)
             }
 
-            // Image
+            // Image (local or remote)
             if let img = post.image {
                 Image(uiImage: img)
                     .resizable()
@@ -417,6 +298,31 @@ struct PostCardView: View {
                     .frame(height: 220)
                     .clipped()
                     .cornerRadius(12)
+            } else if let urlStr = post.imageURLString, let url = URL(string: urlStr) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        Rectangle().fill(Color.gray.opacity(0.15))
+                            .frame(height: 220)
+                            .overlay(ProgressView())
+                            .cornerRadius(12)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 220)
+                            .clipped()
+                            .cornerRadius(12)
+                    case .failure:
+                        Rectangle().fill(Color.gray.opacity(0.15))
+                            .frame(height: 220)
+                            .overlay(Image(systemName: "exclamationmark.triangle"))
+                            .cornerRadius(12)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
             }
 
             // Actions
@@ -573,4 +479,3 @@ struct CommentsSheet: View {
         }
     }
 }
-
