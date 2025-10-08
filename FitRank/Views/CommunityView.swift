@@ -422,11 +422,18 @@ struct NewPostSheet: View {
 
 // MARK: - Comments
 
+import SwiftUI
+import FirebaseAuth
+
 struct CommentsSheet: View {
     let post: CommunityPost
     var onSend: (String) -> Void
 
     @State private var input: String = ""
+    @State private var comments: [CommunityComment] = []
+
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -440,18 +447,62 @@ struct CommentsSheet: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
-                    ForEach(post.comments) { c in
+                    ForEach(comments) { c in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text(c.authorName).font(.subheadline).fontWeight(.semibold)
                                 Text(c.createdAt, style: .relative)
                                     .foregroundColor(.secondary).font(.caption)
+                                Spacer()
+
+                                // Always show the menu; gate "Delete" by ownership
+                                let isOwner = Auth.auth().currentUser?.uid == c.authorId
+                                Menu {
+                                    if isOwner {
+                                        Button(role: .destructive) {
+                                            // Optimistic UI
+                                            if let idx = comments.firstIndex(where: { $0.backendId == c.backendId }) {
+                                                comments.remove(at: idx)
+                                            }
+                                            // Firestore delete
+                                            Task {
+                                                guard let pid = post.backendId else { return }
+                                                do {
+                                                    try await CommunityService.shared.deleteComment(
+                                                        postId: pid,
+                                                        commentId: c.backendId
+                                                    )
+                                                } catch {
+                                                    await MainActor.run {
+                                                        errorMessage = "Couldn’t delete. \(error.localizedDescription)"
+                                                        showErrorAlert = true
+                                                        // put the comment back if delete failed
+                                                        comments.insert(c, at: 0)
+                                                    }
+                                                }
+                                            }
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                    } else {
+                                        // Optional: a disabled item so you can see the menu is present
+                                        Button {
+                                        } label: {
+                                            Label("Only author can delete", systemImage: "lock.fill")
+                                        }.disabled(true)
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis")
+                                        .rotationEffect(.degrees(90))
+                                        .padding(.horizontal, 4)
+                                }
                             }
                             Text(c.text)
                         }
                         .padding(.horizontal)
                     }
-                    if post.comments.isEmpty {
+
+                    if comments.isEmpty {
                         Text("Be the first to comment.")
                             .foregroundColor(.secondary)
                             .padding(.vertical, 40)
@@ -477,5 +528,20 @@ struct CommentsSheet: View {
             }
             .padding()
         }
+        .onAppear {
+            // Live comments feed so we have backendId/authorId
+            guard let pid = post.backendId else { return }
+            CommunityService.shared.startComments(postId: pid) { items in
+                self.comments = items
+            }
+        }
+        .onDisappear {
+            CommunityService.shared.stopComments()
+        }
+        .alert("Error", isPresented: $showErrorAlert, actions: {
+            Button("OK", role: .cancel) {}
+        }, message: {
+            Text(errorMessage)
+        })
     }
 }
