@@ -24,7 +24,7 @@ struct TabContainerView: View {
                     Text("Upload")
                 }
             
-            HeatmapView()
+            Heatmap()
                 .tabItem {
                     Image(systemName: "map.fill")
                     Text("Heatmap")

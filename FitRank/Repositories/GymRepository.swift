@@ -1,5 +1,4 @@
 import Foundation
-import CoreLocation
 import FirebaseFirestore
 
 class GymRepository: ObservableObject {
@@ -71,19 +70,13 @@ class GymRepository: ObservableObject {
                 
                 let decoded = documents.compactMap { doc -> Gym? in
                     do {
-                        print("Attempting to decode gym document: \(doc.documentID)")
-                        print("Document data: \(doc.data())")
-                        
                         var gym = try doc.data(as: Gym.self)
                         if gym.id == nil {
                             gym.id = doc.documentID
                         }
-                        
-                        print("Successfully decoded gym: \(gym.name), ownerTeamId: \(gym.ownerTeamId ?? "nil")")
                         return gym
                     } catch {
                         print("Decoding gym failed for doc \(doc.documentID): \(error)")
-                        print("Error details: \(error)")
                         return nil
                     }
                 }
@@ -103,41 +96,17 @@ class GymRepository: ObservableObject {
         return getTeam(for: teamId)?.color ?? "gray"
     }
     
-    // MARK: - Mock Data for Development (fallback)
-    
-    private func generateMockGyms() -> [Gym] {
-        return [
-            Gym(
-                id: "gIlZvXqqfaj3qdCfAUns",
-                name: "Aneva",
-                location: Location(
-                    address: "24-09 41st Ave, Long Island City, NY 11101",
-                    lat: 40.75266615909022,
-                    lon: -73.93922240996022
-                ),
-                bestSquatId: "/workouts/0",
-                bestBenchId: "/workouts/0",
-                bestDeadliftId: "/workouts/0",
-                ownerTeamId: "0" // Use just the ID, not the full path
-            )
-        ]
-    }
-    
-    // Fallback method for development
-    func fetchGymsMock() {
-        print("Debug: fetchGymsMock called")
-        isLoading = true
-        
-        // Simulate network delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            let mockGyms = self.generateMockGyms()
-            print("Debug: Generated mock gyms: \(mockGyms)")
-            self.gyms = mockGyms
-            print("Debug: Set gyms in repository: \(self.gyms)")
-            self.isLoading = false
+    func addGym(_ gym: Gym) {
+        do {
+            _ = try db.collection("gyms").addDocument(from: gym) { error in
+                if let error = error {
+                    print("Error adding gym: \(error)")
+                } else {
+                    print("Gym added successfully")
+                }
+            }
+        } catch {
+            print("Error encoding gym: \(error)")
         }
     }
 }
-
-
-

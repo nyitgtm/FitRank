@@ -1,18 +1,31 @@
 import Foundation
 import FirebaseFirestore
 
+struct LiftRecord: Codable, Equatable {
+    var weight: Double
+    var userId: String
+    var teamId: String
+    var workoutId: String
+}
+
+struct Location: Codable, Equatable {
+    let address: String?
+    let lat: Double
+    let lon: Double
+}
+
 struct Gym: Identifiable, Codable, Equatable {
     @DocumentID var id: String?
     var name: String
     var location: Location
-    var bestSquatId: String? // Reference to workout document
-    var bestBenchId: String? // Reference to workout document
-    var bestDeadliftId: String? // Reference to workout document
+    var bestSquat: LiftRecord?
+    var bestBench: LiftRecord?
+    var bestDeadlift: LiftRecord?
     var ownerTeamId: String? // Will be extracted from DocumentReference
     
     // Custom coding keys to handle DocumentReference
     enum CodingKeys: String, CodingKey {
-        case id, name, location, bestSquatId, bestBenchId, bestDeadliftId, ownerTeamId
+        case id, name, location, bestSquat, bestBench, bestDeadlift, ownerTeamId
     }
     
     // Custom decoder to handle DocumentReference
@@ -21,19 +34,16 @@ struct Gym: Identifiable, Codable, Equatable {
         
         name = try container.decode(String.self, forKey: .name)
         location = try container.decode(Location.self, forKey: .location)
-        bestSquatId = try container.decodeIfPresent(String.self, forKey: .bestSquatId)
-        bestBenchId = try container.decodeIfPresent(String.self, forKey: .bestBenchId)
-        bestDeadliftId = try container.decodeIfPresent(String.self, forKey: .bestDeadliftId)
+        bestSquat = try container.decodeIfPresent(LiftRecord.self, forKey: .bestSquat)
+        bestBench = try container.decodeIfPresent(LiftRecord.self, forKey: .bestBench)
+        bestDeadlift = try container.decodeIfPresent(LiftRecord.self, forKey: .bestDeadlift)
         
-        // Handle ownerTeamId - try different approaches
+        // Handle ownerTeamId as either String or DocumentReference
         if let teamRef = try? container.decode(DocumentReference.self, forKey: .ownerTeamId) {
-            // If it's a DocumentReference, extract the document ID
             ownerTeamId = teamRef.documentID
         } else if let teamString = try? container.decodeIfPresent(String.self, forKey: .ownerTeamId) {
-            // If it's a string, use it directly
             ownerTeamId = teamString
         } else {
-            // If neither works, set to nil
             ownerTeamId = nil
         }
     }
@@ -44,9 +54,9 @@ struct Gym: Identifiable, Codable, Equatable {
         
         try container.encode(name, forKey: .name)
         try container.encode(location, forKey: .location)
-        try container.encodeIfPresent(bestSquatId, forKey: .bestSquatId)
-        try container.encodeIfPresent(bestBenchId, forKey: .bestBenchId)
-        try container.encodeIfPresent(bestDeadliftId, forKey: .bestDeadliftId)
+        try container.encodeIfPresent(bestSquat, forKey: .bestSquat)
+        try container.encodeIfPresent(bestBench, forKey: .bestBench)
+        try container.encodeIfPresent(bestDeadlift, forKey: .bestDeadlift)
         try container.encodeIfPresent(ownerTeamId, forKey: .ownerTeamId)
     }
     
@@ -58,28 +68,4 @@ struct Gym: Identifiable, Codable, Equatable {
                lhs.location.lon == rhs.location.lon &&
                lhs.ownerTeamId == rhs.ownerTeamId
     }
-    
-    // Custom initializer for creating Gym instances manually
-    init(id: String? = nil, name: String, location: Location, bestSquatId: String? = nil, bestBenchId: String? = nil, bestDeadliftId: String? = nil, ownerTeamId: String? = nil) {
-        self.id = id
-        self.name = name
-        self.location = location
-        self.bestSquatId = bestSquatId
-        self.bestBenchId = bestBenchId
-        self.bestDeadliftId = bestDeadliftId
-        self.ownerTeamId = ownerTeamId
-    }
-}
-
-struct Location: Codable, Equatable {
-    let address: String?
-    let lat: Double
-    let lon: Double
-}
-
-struct LiftRecord: Codable, Equatable {
-    let workoutId: String
-    let weight: Int
-    let userId: String
-    let timestamp: Date
 }
