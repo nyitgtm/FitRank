@@ -13,10 +13,16 @@ struct TabContainerView: View {
     
     var body: some View {
         TabView {
-            HomeView()//pass this in future showSignInView: $showSignInView)
+            HomeView()
                 .tabItem {
                     Image(systemName: "house.fill")
                     Text("Home")
+                }
+            
+            CommunityView()
+                .tabItem {
+                    Image(systemName: "person.3.fill")
+                    Text("Community")
                 }
             
             UploadView()
@@ -25,16 +31,10 @@ struct TabContainerView: View {
                     Text("Upload")
                 }
             
-            Heatmap()
+            NutritionMainView()
                 .tabItem {
-                    Image(systemName: "map.fill")
-                    Text("Heatmap")
-                }
-            
-            LeaderboardView()
-                .tabItem {
-                    Image(systemName: "list.number")
-                    Text("Leaderboard")
+                    Image(systemName: "fork.knife")
+                    Text("Nutrition")
                 }
             
             ProfileView(showSignInView: $showSignInView)

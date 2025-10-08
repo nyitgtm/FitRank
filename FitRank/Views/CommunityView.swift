@@ -36,6 +36,7 @@ struct CommunityView: View {
     // SWAP: we now use the Firebase-backed VM
     @StateObject private var vm = CommunityVM_Firebase()
     @State private var commentingPost: CommunityPost?
+    @State private var showNotifications = false
 
     @State private var showFilter = false
     @State private var hoveredTeam: TeamFilter? = nil
@@ -73,6 +74,28 @@ struct CommunityView: View {
             // Header
             HStack {
                 Spacer()
+                
+                // Notifications button with badge
+                Button {
+                    showNotifications = true
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "bell.fill")
+                            .font(.system(size: 20))
+                        
+                        if vm.unreadCount > 0 {
+                            Text("\(vm.unreadCount)")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .frame(minWidth: 16, minHeight: 16)
+                                .background(Color.red)
+                                .clipShape(Circle())
+                                .offset(x: 8, y: -8)
+                        }
+                    }
+                }
+                
                 Button {
                     vm.showComposer = true
                 } label: {
@@ -163,6 +186,20 @@ struct CommunityView: View {
             CommentsSheet(
                 post: post,
                 onSend: { txt in vm.addComment(txt, to: post) }
+            )
+            .presentationDetents([.medium, .large])
+        }
+        
+        // Notifications Sheet
+        .sheet(isPresented: $showNotifications) {
+            NotificationsSheet(
+                notifications: vm.notifications,
+                onTapNotification: { notification in
+                    vm.markNotificationAsRead(notification)
+                },
+                onMarkAllRead: {
+                    vm.markAllNotificationsAsRead()
+                }
             )
             .presentationDetents([.medium, .large])
         }

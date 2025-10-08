@@ -6,18 +6,13 @@ struct HomeView: View {
     @StateObject private var userViewModel = UserViewModel()
     @State private var selectedFilter: WorkoutFilter = .all
     @State private var showingUpload = false
-
-    // NEW: use this to push CommunityView when the purple chip is tapped
-    @State private var goToCommunity = false
-    @State private var showingCommunity = false
-    @State private var showingNutrition = false   // REPLACED: Now for nutrition
+    @State private var showingLeaderboard = false
 
     enum WorkoutFilter: String, CaseIterable {
         case all = "All"
         case following = "Following"
         case team = "Team"
         case trending = "Trending"
-        case community = "Community"
 
         var color: Color {
             switch self {
@@ -25,7 +20,6 @@ struct HomeView: View {
             case .following: return .green
             case .team: return .orange
             case .trending: return .red
-            case .community: return .purple
             }
         }
     }
@@ -33,16 +27,11 @@ struct HomeView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
+                // Custom FitRank Header
+                FitRankHeaderView()
+                    .padding(.vertical, 8)
 
-                // Hidden link that pushes the Community page
-                NavigationLink(
-                    destination: CommunityView()
-                        .navigationBarTitleDisplayMode(.inline),
-                    isActive: $goToCommunity
-                ) { EmptyView() }
-                .hidden()
-
-                // Filter tabs (purple Community chip lives here)
+                // Filter tabs
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
                         ForEach(WorkoutFilter.allCases, id: \.self) { filter in
@@ -51,9 +40,6 @@ struct HomeView: View {
                                 isSelected: selectedFilter == filter
                             ) {
                                 selectedFilter = filter
-                                if filter == .community {
-                                    goToCommunity = true   // push CommunityView
-                                }
                             }
                         }
                     }
@@ -91,41 +77,47 @@ struct HomeView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
+                            // Workout cards
                             ForEach(workoutViewModel.workouts) { workout in
                                 WorkoutCardView(workout: workout)
                                     .padding(.horizontal, 20)
                             }
+                            
+                            // Heatmap section at the bottom
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Image(systemName: "map.fill")
+                                        .foregroundColor(.blue)
+                                    Text("Gym Heatmap")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 20)
+                                
+                                // Embedded mini heatmap
+                                Heatmap()
+                                    .frame(height: 300)
+                                    .cornerRadius(16)
+                                    .padding(.horizontal, 20)
+                            }
+                            .padding(.vertical, 16)
                         }
                         .padding(.vertical, 16)
                     }
                 }
             }
-            .navigationTitle("FitRank")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // REPLACED: Community button with Nutrition button
+                // Leaderboard button (trophy icon)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        showingNutrition = true
+                        showingLeaderboard = true
                     } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "fork.knife")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text("Nutrition")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [.blue, .purple]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .cornerRadius(16)
+                        Image(systemName: "trophy.fill")
+                            .font(.title3)
+                            .foregroundColor(.yellow)
+                            .shadow(color: .orange.opacity(0.3), radius: 2, x: 0, y: 1)
                     }
                 }
                 
@@ -138,10 +130,76 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $showingUpload) { UploadView() }
-        .sheet(isPresented: $showingCommunity) { CommunityView() }
-        // CHANGE THIS ONE LINE ONLY:
-        .sheet(isPresented: $showingNutrition) { NutritionMainView() }  // CHANGED: Now opens Nutrition Hub instead of direct calculator
+        .sheet(isPresented: $showingLeaderboard) { LeaderboardView() }
         .onAppear { workoutViewModel.fetchWorkouts() }
+    }
+}
+
+// Sleek FitRank header with dark gym aesthetic
+struct FitRankHeaderView: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            // Dark metallic dumbbell icon
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color(red: 0.05, green: 0.05, blue: 0.05),  // Deep black
+                                Color(red: 0.2, green: 0.2, blue: 0.22),    // Dark charcoal
+                                Color(red: 0.5, green: 0.52, blue: 0.55)    // Silver
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 62, height: 62)
+                    .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
+                
+                Image(systemName: "dumbbell.fill")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            
+            // FitRank text with dark red/orange gradient
+            Text("FitRank")
+                .font(.system(size: 45, weight: .black, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 0.15, green: 0.15, blue: 0.15),      // Dark gray (start)
+                            Color(red: 0.3, green: 0.32, blue: 0.35),       // Darker medium (middle)
+                            Color(red: 0.42, green: 0.44, blue: 0.47)       // Subdued silver (end)
+                        ]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .shadow(color: .black.opacity(0.5), radius: 4, x: 0, y: 2)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 0.3, green: 0.3, blue: 0.3).opacity(0.5),
+                            Color(red: 0.6, green: 0.62, blue: 0.65).opacity(0.5)
+                        ]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    lineWidth: 2
+                )
+        )
+        .padding(.horizontal, 20)
     }
 }
 
@@ -163,4 +221,3 @@ struct FilterTabView: View {
         }
     }
 }
-

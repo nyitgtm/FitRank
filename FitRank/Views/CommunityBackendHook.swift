@@ -5,6 +5,17 @@ import FirebaseStorage
 
 // MARK: - Models (single source of truth)
 
+struct CommunityNotification: Identifiable, Hashable {
+    let id: UUID = UUID()
+    var backendId: String          // Firestore notification doc id
+    var type: String               // "like" or "comment"
+    var actorId: String            // who performed the action
+    var actorName: String
+    var postId: String             // which post
+    var postText: String           // preview of post
+    var isRead: Bool
+    var createdAt: Date
+}
 
 struct CommunityComment: Identifiable, Hashable {
     let id: UUID = UUID()
@@ -42,16 +53,15 @@ final class CommunityService {
     private let db = Firestore.firestore()
     private init() {}
 
-   public var feedListener: ListenerRegistration?
+    public var feedListener: ListenerRegistration?
+    private var commentsListener: ListenerRegistration?
+    private var notificationsListener: ListenerRegistration?
+    
     func deleteComment(postId: String, commentId: String) async throws {
         let postRef = db.collection("posts").document(postId)
         try await postRef.collection("comments").document(commentId).delete()
         try await postRef.updateData(["commentCount": FieldValue.increment(Int64(-1))])
     }
-    // 1) Add this property near the top of CommunityService (with feedListener)
-    private var commentsListener: ListenerRegistration?
-
-    // 2) Add these methods anywhere inside CommunityService:
 
     // Live comments for a post
     func startComments(postId: String, onChange: @escaping ([CommunityComment]) -> Void) {
@@ -79,9 +89,58 @@ final class CommunityService {
         commentsListener?.remove()
         commentsListener = nil
     }
-
-    // Delete a single comment and decrement counter
-   
+    
+    // MARK: - Notifications
+    
+    func startNotifications(onChange: @escaping ([CommunityNotification]) -> Void) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        
+        notificationsListener?.remove()
+        notificationsListener = db.collection("users").document(uid)
+            .collection("notifications")
+            .order(by: "createdAt", descending: true)
+            .limit(to: 50)
+            .addSnapshotListener { snap, _ in
+                let items: [CommunityNotification] = (snap?.documents ?? []).compactMap { doc in
+                    let data = doc.data()
+                    return CommunityNotification(
+                        backendId: doc.documentID,
+                        type: data["type"] as? String ?? "like",
+                        actorId: data["actorId"] as? String ?? "",
+                        actorName: data["actorName"] as? String ?? "User",
+                        postId: data["postId"] as? String ?? "",
+                        postText: data["postText"] as? String ?? "",
+                        isRead: data["isRead"] as? Bool ?? false,
+                        createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+                    )
+                }
+                onChange(items)
+            }
+    }
+    
+    func stopNotifications() {
+        notificationsListener?.remove()
+        notificationsListener = nil
+    }
+    
+    func markNotificationAsRead(notificationId: String) async {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let notifRef = db.collection("users").document(uid).collection("notifications").document(notificationId)
+        try? await notifRef.updateData(["isRead": true])
+    }
+    
+    func markAllNotificationsAsRead() async {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let snapshot = try? await db.collection("users").document(uid)
+            .collection("notifications")
+            .whereField("isRead", isEqualTo: false)
+            .getDocuments()
+        
+        guard let docs = snapshot?.documents else { return }
+        for doc in docs {
+            try? await doc.reference.updateData(["isRead": true])
+        }
+    }
 
     func startFeed(onChange: @escaping ([CommunityFeedItem]) -> Void) {
         feedListener?.remove()
@@ -93,7 +152,7 @@ final class CommunityService {
                     let data = doc.data()
                     return CommunityFeedItem(
                         id: doc.documentID,
-                        authorId: data["authorId"] as? String ?? "",         // ✅
+                        authorId: data["authorId"] as? String ?? "",
                         authorName: data["authorName"] as? String ?? "User",
                         teamTag: data["teamTag"] as? String,
                         text: data["text"] as? String ?? "",
@@ -155,17 +214,55 @@ final class CommunityService {
         ])
     }
 
-    func toggleLike(postId: String, currentlyLiked: Bool) async {
+    func toggleLike(postId: String, postAuthorId: String, postText: String, currentlyLiked: Bool) async {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         let postRef = db.collection("posts").document(postId)
         let likeRef = postRef.collection("likes").document(uid)
+        
         do {
             if currentlyLiked {
+                // Unlike - remove like and notification
                 try await likeRef.delete()
                 try await postRef.updateData(["likeCount": FieldValue.increment(Int64(-1))])
+                
+                // Remove notification if it exists
+                if postAuthorId != uid {
+                    let notifSnapshot = try await db.collection("users").document(postAuthorId)
+                        .collection("notifications")
+                        .whereField("actorId", isEqualTo: uid)
+                        .whereField("postId", isEqualTo: postId)
+                        .whereField("type", isEqualTo: "like")
+                        .getDocuments()
+                    
+                    for doc in notifSnapshot.documents {
+                        try await doc.reference.delete()
+                    }
+                }
             } else {
+                // Like - add like and create notification
                 try await likeRef.setData(["createdAt": FieldValue.serverTimestamp()])
                 try await postRef.updateData(["likeCount": FieldValue.increment(Int64(1))])
+                
+                // Create notification for post author (but not if liking own post)
+                if postAuthorId != uid {
+                    let userDoc = try await db.collection("users").document(uid).getDocument()
+                    let likerName = (userDoc.data()?["name"] as? String)
+                                   ?? (userDoc.data()?["username"] as? String)
+                                   ?? "Someone"
+                    
+                    let notifRef = db.collection("users").document(postAuthorId)
+                        .collection("notifications").document()
+                    
+                    try await notifRef.setData([
+                        "type": "like",
+                        "actorId": uid,
+                        "actorName": likerName,
+                        "postId": postId,
+                        "postText": String(postText.prefix(50)),
+                        "isRead": false,
+                        "createdAt": FieldValue.serverTimestamp()
+                    ])
+                }
             }
         } catch {
             print("toggleLike error:", error)
@@ -206,14 +303,22 @@ final class CommunityService {
 @MainActor
 final class CommunityVM_Firebase: ObservableObject {
     @Published var posts: [CommunityPost] = []
+    @Published var notifications: [CommunityNotification] = []
     @Published var isLoading = false
     @Published var showComposer = false
     @Published var draftText = ""
     @Published var draftImage: UIImage?
+    
+    var unreadCount: Int {
+        notifications.filter { !$0.isRead }.count
+    }
 
     private let svc = CommunityService.shared
 
-    init() { listen() }
+    init() { 
+        listen()
+        listenNotifications()
+    }
 
     private func listen() {
         isLoading = true
@@ -226,7 +331,7 @@ final class CommunityVM_Firebase: ObservableObject {
                     mapped.append(
                         CommunityPost(
                             backendId: it.id,
-                            authorId: it.authorId, // Fixed: was empty string
+                            authorId: it.authorId,
                             authorName: it.authorName,
                             teamTag: it.teamTag,
                             text: it.text,
@@ -245,13 +350,21 @@ final class CommunityVM_Firebase: ObservableObject {
             }
         }
     }
+    
+    private func listenNotifications() {
+        svc.startNotifications { [weak self] items in
+            Task { @MainActor in
+                self?.notifications = items
+            }
+        }
+    }
 
     deinit {
         Task { @MainActor in
             CommunityService.shared.stopFeed()
+            CommunityService.shared.stopNotifications()
         }
     }
-
 
     func publishDraft() {
         let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -272,7 +385,14 @@ final class CommunityVM_Firebase: ObservableObject {
 
     func toggleLike(_ post: CommunityPost) {
         guard let id = post.backendId else { return }
-        Task { await svc.toggleLike(postId: id, currentlyLiked: post.isLikedByMe) }
+        Task { 
+            await svc.toggleLike(
+                postId: id,
+                postAuthorId: post.authorId,
+                postText: post.text,
+                currentlyLiked: post.isLikedByMe
+            )
+        }
         // optimistic UI
         if let i = posts.firstIndex(of: post) {
             posts[i].isLikedByMe.toggle()
@@ -301,12 +421,21 @@ final class CommunityVM_Firebase: ObservableObject {
                 try await svc.deletePost(postId: id)
             } catch {
                 print("Failed to delete post: \(error)")
-                // Could re-fetch or show error here
             }
         }
     }
     
+    func markNotificationAsRead(_ notification: CommunityNotification) {
+        Task {
+            await svc.markNotificationAsRead(notificationId: notification.backendId)
+        }
+    }
     
+    func markAllNotificationsAsRead() {
+        Task {
+            await svc.markAllNotificationsAsRead()
+        }
+    }
 }
 
 
