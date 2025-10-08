@@ -1,3 +1,7 @@
+//
+//  FirebaseService.swift
+//
+
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
@@ -10,11 +14,13 @@ import UIKit
 import FirebaseStorage
 #endif
 
+// MARK: - Service
+
 class FirebaseService: ObservableObject {
     static let shared = FirebaseService()
     private let db = Firestore.firestore()
 
-    // Live listeners for Community
+    // Live listeners
     private var communityFeedListener: ListenerRegistration?
     private var communityCommentsListener: ListenerRegistration?
 
@@ -111,7 +117,7 @@ class FirebaseService: ObservableObject {
         try await workoutRef.setData(from: workout)
     }
 
-    // MARK: - Comment Operations
+    // MARK: - Global Comment Operations (non-community)
 
     func createComment(_ comment: Comment) async throws {
         try await db.collection("comments").addDocument(from: comment)
@@ -176,7 +182,7 @@ class FirebaseService: ObservableObject {
         try await db.collection("reports").document(reportId).updateData(["status": status.rawValue])
     }
 
-    // MARK: - Storage Operations (Mock Implementation)
+    // MARK: - Storage (Mock)
 
     func uploadVideo(url: URL, fileName: String) async throws -> String {
         return "https://example.com/videos/\(fileName)"
@@ -187,10 +193,12 @@ class FirebaseService: ObservableObject {
     }
 }
 
-// MARK: - Community Feature (no FirebaseFirestoreSwift required)
+// MARK: - Community Feature
 
+// Feed item fetched from Firestore
 struct CommunityFeedItem {
     let id: String
+    let authorId: String
     let authorName: String
     let teamTag: String?
     let text: String
@@ -200,6 +208,7 @@ struct CommunityFeedItem {
     let createdAt: Date
 }
 
+// Slim comment item for live stream
 struct CommunityCommentItem {
     let id: String
     let authorName: String
@@ -209,8 +218,9 @@ struct CommunityCommentItem {
 
 extension FirebaseService {
 
-    // live feed
-    func startCommunityFeed(onChange: @escaping ([CommunityFeedItem]) -> Void) {
+    // MARK: Live Feed
+
+    func startFeed(onChange: @escaping ([CommunityFeedItem]) -> Void) {
         communityFeedListener?.remove()
         communityFeedListener = db.collection("posts")
             .order(by: "createdAt", descending: true)
@@ -220,6 +230,7 @@ extension FirebaseService {
                     let data = doc.data()
                     return CommunityFeedItem(
                         id: doc.documentID,
+                        authorId: data["authorId"] as? String ?? "",
                         authorName: data["authorName"] as? String ?? "User",
                         teamTag: data["teamTag"] as? String,
                         text: data["text"] as? String ?? "",
@@ -233,12 +244,13 @@ extension FirebaseService {
             }
     }
 
-    func stopCommunityFeed() {
+    func stopFeed() {
         communityFeedListener?.remove()
         communityFeedListener = nil
     }
 
-    // create post (pulls name/team from users/{uid})
+    // MARK: Create Post
+
     func createCommunityPost(text: String, image: UIImage?) async throws {
         guard let uid = Auth.auth().currentUser?.uid else { throw FirebaseError.permissionDenied }
 
@@ -249,18 +261,21 @@ extension FirebaseService {
 
         var teamName: String? = nil
         if let teamPath = userDoc.data()?["team"] as? String, !teamPath.isEmpty {
-            let teamDoc = try await db.document(teamPath).getDocument()
-            teamName = teamDoc.data()?["name"] as? String
+            if teamPath.contains("/teams/") {
+                let teamDoc = try await db.document(teamPath).getDocument()
+                teamName = teamDoc.data()?["name"] as? String
+            } else {
+                teamName = teamPath
+            }
         }
 
         let ref = db.collection("posts").document()
 
         var imageURL: String? = nil
         #if canImport(FirebaseStorage)
-        if let image {
-            let data = image.jpegData(compressionQuality: 0.85) ?? Data()
+        if let image, let data = image.jpegData(compressionQuality: 0.85) {
             let storageRef = Storage.storage().reference(withPath: "posts/\(ref.documentID)/photo.jpg")
-            try await storageRef.putDataAsync(data, metadata: nil)
+            _ = try await storageRef.putDataAsync(data, metadata: nil)
             imageURL = try await storageRef.downloadURL().absoluteString
         }
         #endif
@@ -277,7 +292,8 @@ extension FirebaseService {
         ])
     }
 
-    // likes
+    // MARK: Likes
+
     func toggleCommunityLike(postId: String, currentlyLiked: Bool) async {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         let postRef = db.collection("posts").document(postId)
@@ -295,7 +311,8 @@ extension FirebaseService {
         }
     }
 
-    // comments (live)
+    // MARK: Comments (live under a post)
+
     func startCommunityComments(postId: String, onChange: @escaping ([CommunityCommentItem]) -> Void) {
         communityCommentsListener?.remove()
         communityCommentsListener = db.collection("posts").document(postId)
@@ -340,9 +357,47 @@ extension FirebaseService {
             print("addCommunityComment error:", error)
         }
     }
+
+    // MARK: Delete comment (community)
+
+    func deleteCommunityComment(postId: String, commentId: String) async throws {
+        let postRef = db.collection("posts").document(postId)
+        try await postRef.collection("comments").document(commentId).delete()
+        try await postRef.updateData(["commentCount": FieldValue.increment(Int64(-1))])
+    }
 }
 
-// MARK: - Firebase Errors
+// MARK: - Post deletion (extension)
+
+extension FirebaseService {
+    /// Delete a community post + subcollections + image
+    func deleteCommunityPost(postId: String) async throws {
+        let postRef = db.collection("posts").document(postId)
+
+        // delete comments
+        let commentsSnap = try await postRef.collection("comments").getDocuments()
+        for doc in commentsSnap.documents {
+            try await doc.reference.delete()
+        }
+
+        // delete likes
+        let likesSnap = try await postRef.collection("likes").getDocuments()
+        for doc in likesSnap.documents {
+            try await doc.reference.delete()
+        }
+
+        // delete image (best effort)
+        #if canImport(FirebaseStorage)
+        let storageRef = Storage.storage().reference(withPath: "posts/\(postId)/photo.jpg")
+        try? await storageRef.delete()
+        #endif
+
+        // delete post
+        try await postRef.delete()
+    }
+}
+
+// MARK: - Errors
 
 enum FirebaseError: Error, LocalizedError {
     case invalidUserId
@@ -355,13 +410,14 @@ enum FirebaseError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidUserId:   return "Invalid user ID"
-        case .invalidWorkoutId:return "Invalid workout ID"
-        case .duplicateRating: return "You have already rated this workout"
-        case .decodingError:   return "Failed to decode data"
-        case .networkError:    return "Network error occurred"
-        case .permissionDenied:return "Permission denied"
-        case .invalidDocument: return "Invalid document ID"
+        case .invalidUserId:    return "Invalid user ID"
+        case .invalidWorkoutId: return "Invalid workout ID"
+        case .duplicateRating:  return "You have already rated this workout"
+        case .decodingError:    return "Failed to decode data"
+        case .networkError:     return "Network error occurred"
+        case .permissionDenied: return "Permission denied"
+        case .invalidDocument:  return "Invalid document ID"
         }
     }
 }
+

@@ -8,14 +8,18 @@ import FirebaseStorage
 
 struct CommunityComment: Identifiable, Hashable {
     let id: UUID = UUID()
+    var backendId: String          // Firestore comment doc id
+    var authorId: String           // who wrote it
     var authorName: String
     var text: String
     var createdAt: Date
 }
 
+
 struct CommunityPost: Identifiable, Hashable {
     let id: UUID = UUID()
     var backendId: String?          // Firestore doc id
+    var authorId: String            // who wrote it
     var authorName: String
     var teamTag: String?
     var text: String
@@ -28,14 +32,56 @@ struct CommunityPost: Identifiable, Hashable {
     var comments: [CommunityComment] = []
 }
 
+
+
 // MARK: - Minimal Firebase Community Service
 @MainActor
+
 final class CommunityService {
     static let shared = CommunityService()
     private let db = Firestore.firestore()
     private init() {}
 
-    private var feedListener: ListenerRegistration?
+   public var feedListener: ListenerRegistration?
+    func deleteComment(postId: String, commentId: String) async throws {
+        let postRef = db.collection("posts").document(postId)
+        try await postRef.collection("comments").document(commentId).delete()
+        try await postRef.updateData(["commentCount": FieldValue.increment(Int64(-1))])
+    }
+    // 1) Add this property near the top of CommunityService (with feedListener)
+    private var commentsListener: ListenerRegistration?
+
+    // 2) Add these methods anywhere inside CommunityService:
+
+    // Live comments for a post
+    func startComments(postId: String, onChange: @escaping ([CommunityComment]) -> Void) {
+        commentsListener?.remove()
+        commentsListener = db.collection("posts").document(postId)
+            .collection("comments")
+            .order(by: "createdAt", descending: false)
+            .addSnapshotListener { snap, _ in
+                let items: [CommunityComment] = (snap?.documents ?? []).compactMap { doc in
+                    let data = doc.data()
+                    return CommunityComment(
+                        backendId: doc.documentID,
+                        authorId: data["authorId"] as? String ?? "",
+                        authorName: data["authorName"] as? String ?? "User",
+                        text: data["text"] as? String ?? "",
+                        createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+                    )
+                }
+                onChange(items)
+            }
+    }
+
+    // Stop comments listener
+    func stopComments() {
+        commentsListener?.remove()
+        commentsListener = nil
+    }
+
+    // Delete a single comment and decrement counter
+   
 
     func startFeed(onChange: @escaping ([CommunityFeedItem]) -> Void) {
         feedListener?.remove()
@@ -47,6 +93,7 @@ final class CommunityService {
                     let data = doc.data()
                     return CommunityFeedItem(
                         id: doc.documentID,
+                        authorId: data["authorId"] as? String ?? "",         // ✅
                         authorName: data["authorName"] as? String ?? "User",
                         teamTag: data["teamTag"] as? String,
                         text: data["text"] as? String ?? "",
@@ -59,6 +106,7 @@ final class CommunityService {
                 onChange(items)
             }
     }
+
 
     func stopFeed() {
         feedListener?.remove()
@@ -177,7 +225,7 @@ final class CommunityVM_Firebase: ObservableObject {
                     let liked = await self.svc.isLikedByMe(postId: it.id)
                     mapped.append(
                         CommunityPost(
-                            backendId: it.id,
+                            backendId: it.id, authorId:"", //
                             authorName: it.authorName,
                             teamTag: it.teamTag,
                             text: it.text,
@@ -244,26 +292,31 @@ final class CommunityVM_Firebase: ObservableObject {
 }
 
 
-// MARK: - One-shot fetch for manual refresh
-extension CommunityService {
-    func fetchLatest(limit: Int = 50) async throws -> [CommunityFeedItem] {
-        let snap = try await db.collection("posts")
-            .order(by: "createdAt", descending: true)
-            .limit(to: limit)
-            .getDocuments()
+import FirebaseFirestore
+import FirebaseStorage
 
-        return snap.documents.compactMap { doc in
-            let data = doc.data()
-            return CommunityFeedItem(
-                id: doc.documentID,
-                authorName: data["authorName"] as? String ?? "User",
-                teamTag: data["teamTag"] as? String,
-                text: data["text"] as? String ?? "",
-                imageURLString: data["imageURL"] as? String,
-                likeCount: data["likeCount"] as? Int ?? 0,
-                commentCount: data["commentCount"] as? Int ?? 0,
-                createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
-            )
+extension CommunityService {
+    /// Delete post + its subcollections (comments/likes) + storage image
+    func deletePost(postId: String) async throws {
+        let postRef = db.collection("posts").document(postId)
+
+        // delete comments
+        let commentsSnap = try await postRef.collection("comments").getDocuments()
+        for doc in commentsSnap.documents {
+            try await doc.reference.delete()
         }
+
+        // delete likes
+        let likesSnap = try await postRef.collection("likes").getDocuments()
+        for doc in likesSnap.documents {
+            try await doc.reference.delete()
+        }
+
+        // delete image (best-effort)
+        let storageRef = Storage.storage().reference(withPath: "posts/\(postId)/photo.jpg")
+        try? await storageRef.delete()
+
+        // delete post
+        try await postRef.delete()
     }
 }
