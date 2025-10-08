@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import FirebaseAuth
 
 // MARK: - Team Filter
 
@@ -134,7 +135,8 @@ struct CommunityView: View {
                                 PostCardView(
                                     post: post,
                                     likeAction: { vm.toggleLike(post) },
-                                    commentAction: { commentingPost = post }
+                                    commentAction: { commentingPost = post },
+                                    deleteAction: { vm.deletePost(post) }
                                 )
                                 .padding(.horizontal, 16)
                             }
@@ -248,6 +250,9 @@ struct PostCardView: View {
     let post: CommunityPost
     var likeAction: () -> Void
     var commentAction: () -> Void
+    var deleteAction: (() -> Void)? = nil
+    
+    @State private var showDeleteAlert = false
 
     private var teamColor: Color {
         let tag = post.teamTag?.lowercased() ?? ""
@@ -281,7 +286,26 @@ struct PostCardView: View {
                     }
                 }
                 Spacer()
-                Image(systemName: "ellipsis")
+                
+                // Menu for post actions (delete if owner)
+                let isOwner = Auth.auth().currentUser?.uid == post.authorId
+                Menu {
+                    if isOwner {
+                        Button(role: .destructive) {
+                            showDeleteAlert = true
+                        } label: {
+                            Label("Delete Post", systemImage: "trash")
+                        }
+                    } else {
+                        Button {
+                        } label: {
+                            Label("Only author can delete", systemImage: "lock.fill")
+                        }.disabled(true)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .padding(.horizontal, 4)
+                }
             }
 
             // Text
@@ -344,6 +368,14 @@ struct PostCardView: View {
         .padding()
         .background(Color(.secondarySystemBackground))
         .cornerRadius(16)
+        .alert("Delete Post", isPresented: $showDeleteAlert, actions: {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                deleteAction?()
+            }
+        }, message: {
+            Text("Are you sure you want to delete this post? This action cannot be undone.")
+        })
     }
 }
 

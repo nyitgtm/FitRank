@@ -225,7 +225,8 @@ final class CommunityVM_Firebase: ObservableObject {
                     let liked = await self.svc.isLikedByMe(postId: it.id)
                     mapped.append(
                         CommunityPost(
-                            backendId: it.id, authorId:"", //
+                            backendId: it.id,
+                            authorId: it.authorId, // Fixed: was empty string
                             authorName: it.authorName,
                             teamTag: it.teamTag,
                             text: it.text,
@@ -284,8 +285,25 @@ final class CommunityVM_Firebase: ObservableObject {
         let msg = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !msg.isEmpty else { return }
         Task { await svc.addComment(postId: id, text: msg) }
+    }
+    
+    func deletePost(_ post: CommunityPost) {
+        guard let id = post.backendId else { return }
         
+        // Optimistic UI - remove from list immediately
+        if let index = posts.firstIndex(where: { $0.backendId == id }) {
+            posts.remove(at: index)
+        }
         
+        // Delete from Firebase
+        Task {
+            do {
+                try await svc.deletePost(postId: id)
+            } catch {
+                print("Failed to delete post: \(error)")
+                // Could re-fetch or show error here
+            }
+        }
     }
     
     
