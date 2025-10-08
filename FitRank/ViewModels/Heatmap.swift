@@ -68,6 +68,8 @@ struct PulsingDot: View {
 }
 
 struct Heatmap: View {
+    @ObservedObject var gymRepository: GymRepository  // Changed from @StateObject to @ObservedObject and made it a parameter
+    
     @State private var cameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 40.7282, longitude: -73.7949),
@@ -76,7 +78,6 @@ struct Heatmap: View {
     )
 
     @StateObject private var locationManager = LocationManager()
-    @StateObject private var gymRepository = GymRepository()
     @State private var currentZoomLevel: Double = 0.05 // Track zoom level
     
     // Computed property to check if map is zoomed in enough to show team labels
@@ -156,19 +157,6 @@ struct Heatmap: View {
             mapView
             
             VStack {
-                if gymRepository.isLoading {
-                    HStack {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                        Text("Loading gyms...")
-                            .font(.caption)
-                    }
-                    .padding()
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(20)
-                    .padding(.top, 60)
-                }
-                
                 Spacer()
                 
                 HStack {
@@ -180,7 +168,7 @@ struct Heatmap: View {
         .edgesIgnoringSafeArea(.all)
         .onAppear {
             locationManager.requestLocationPermission()
-            gymRepository.fetchGyms()
+            // Removed gymRepository.fetchGyms() - now handled by parent view
         }
         .onChange(of: gymRepository.gyms.count) { _, count in
             // Auto-zoom when gyms are loaded
@@ -261,10 +249,10 @@ struct Heatmap: View {
                 .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
         }
         .padding(.leading, 20)
-        .padding(.bottom, 120)
+        .padding(.bottom, 30)
     }
 }
 
 #Preview {
-    Heatmap()
+    Heatmap(gymRepository: GymRepository())
 }

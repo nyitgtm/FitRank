@@ -4,9 +4,12 @@ import PhotosUI
 struct HomeView: View {
     @StateObject private var workoutViewModel = WorkoutViewModel()
     @StateObject private var userViewModel = UserViewModel()
+    @StateObject private var gymRepository = GymRepository()
     @State private var selectedFilter: WorkoutFilter = .all
     @State private var showingUpload = false
     @State private var showingLeaderboard = false
+    @State private var showingFullScreenHeatmap = false
+    @State private var hasLoadedGyms = false
 
     enum WorkoutFilter: String, CaseIterable {
         case all = "All"
@@ -76,7 +79,7 @@ struct HomeView: View {
                     Spacer()
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 16) {
+                        VStack(spacing: 16) {
                             // Workout cards
                             ForEach(workoutViewModel.workouts) { workout in
                                 WorkoutCardView(workout: workout)
@@ -95,11 +98,43 @@ struct HomeView: View {
                                 }
                                 .padding(.horizontal, 20)
                                 
-                                // Embedded mini heatmap
-                                Heatmap()
-                                    .frame(height: 300)
-                                    .cornerRadius(16)
-                                    .padding(.horizontal, 20)
+                                // Loading state or mini heatmap preview
+                                if !hasLoadedGyms {
+                                    HeatmapLoadingBox()
+                                        .frame(height: 300)
+                                        .padding(.horizontal, 20)
+                                } else {
+                                    // Mini heatmap preview (clickable)
+                                    Heatmap(gymRepository: gymRepository)
+                                        .frame(height: 300)
+                                        .cornerRadius(16)
+                                        .padding(.horizontal, 20)
+                                        .onTapGesture {
+                                            showingFullScreenHeatmap = true
+                                        }
+                                        .overlay(
+                                            // Subtle tap hint overlay
+                                            VStack {
+                                                Spacer()
+                                                HStack {
+                                                    Spacer()
+                                                    HStack(spacing: 4) {
+                                                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                                            .font(.caption2)
+                                                        Text("Tap to expand")
+                                                            .font(.caption2)
+                                                            .fontWeight(.medium)
+                                                    }
+                                                    .foregroundColor(.white)
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 6)
+                                                    .background(.ultraThinMaterial)
+                                                    .cornerRadius(12)
+                                                    .padding(12)
+                                                }
+                                            }
+                                        )
+                                }
                             }
                             .padding(.vertical, 16)
                         }
@@ -131,7 +166,19 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingUpload) { UploadView() }
         .sheet(isPresented: $showingLeaderboard) { LeaderboardView() }
-        .onAppear { workoutViewModel.fetchWorkouts() }
+        .fullScreenCover(isPresented: $showingFullScreenHeatmap) {
+            FullScreenHeatmapView(isPresented: $showingFullScreenHeatmap, gymRepository: gymRepository)
+        }
+        .onAppear {
+            workoutViewModel.fetchWorkouts()
+            // Fetch gyms immediately on view appear
+            gymRepository.fetchGyms()
+        }
+        .onChange(of: gymRepository.gyms.count) { oldValue, newValue in
+            if newValue > 0 {
+                hasLoadedGyms = true
+            }
+        }
     }
 }
 
@@ -218,6 +265,128 @@ struct FilterTabView: View {
                 .padding(.vertical, 6)
                 .background(isSelected ? filter.color : filter.color.opacity(0.1))
                 .cornerRadius(16)
+        }
+    }
+}
+
+// Loading box for heatmap
+struct HeatmapLoadingBox: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemGray6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color(.systemGray4), lineWidth: 1)
+                )
+            
+            VStack(spacing: 16) {
+                ProgressView()
+                    .scaleEffect(1.5)
+                
+                Text("Loading Gyms...")
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+                
+                Text("Fetching nearby gym data")
+                    .font(.caption)
+                    .foregroundColor(.secondary.opacity(0.7))
+            }
+        }
+    }
+}
+
+// Preview box for heatmap (clickable)
+struct HeatmapPreviewBox: View {
+    let gymCount: Int
+    
+    var body: some View {
+        ZStack {
+            // Blurred background to suggest map content
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.blue.opacity(0.1),
+                            Color.green.opacity(0.1)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.blue.opacity(0.3), lineWidth: 2)
+                )
+            
+            VStack(spacing: 12) {
+                Image(systemName: "map.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(.blue)
+                
+                Text("\(gymCount) Gyms Loaded")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Text("Tap to view full heatmap")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.tap.fill")
+                        .foregroundColor(.blue)
+                    Text("Tap Here")
+                        .fontWeight(.semibold)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(Color.blue.opacity(0.15))
+                .cornerRadius(20)
+            }
+        }
+        .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
+}
+
+// Full screen heatmap view
+struct FullScreenHeatmapView: View {
+    @Binding var isPresented: Bool
+    @ObservedObject var gymRepository: GymRepository
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            // The heatmap fills the entire screen
+            Heatmap(gymRepository: gymRepository)
+                .edgesIgnoringSafeArea(.all)
+            
+            // Done button in top left
+            VStack {
+                HStack {
+                    Button {
+                        isPresented = false
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title2)
+                            Text("Done")
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(20)
+                        .shadow(color: .black.opacity(0.4), radius: 5, x: 0, y: 2)
+                    }
+                    .padding(.leading, 20)
+                    .padding(.top, 30) //change padding
+                    
+                    Spacer()
+                }
+                
+                Spacer()
+            }
         }
     }
 }
