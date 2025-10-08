@@ -1,17 +1,18 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
-    // User profiles: readable by all signed-in users, writable only by owner
+
+    // ---------- USERS ----------
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if false; // Users cannot delete their profiles
+      allow delete: if false;
     }
-    
-    // Workouts: any user can read published ones, only owner or admin can update/delete
+
+    // ---------- WORKOUTS ----------
     match /workouts/{workoutId} {
-      allow read: if true; // Anyone can read published workouts
+      allow read: if true;
       allow create: if request.auth != null;
       allow update: if request.auth != null &&
          (request.auth.uid == resource.data.userId ||
@@ -20,30 +21,17 @@ service cloud.firestore {
          (request.auth.uid == resource.data.userId ||
           get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true);
     }
-    
-    // Ratings: only authenticated users can create, and ensure one per user per workout
+
+    // ---------- RATINGS ----------
     match /ratings/{ratingId} {
       allow read: if true;
       allow create: if request.auth != null &&
          request.auth.uid == resource.data.userID &&
          resource.data.value in [1, -1];
-      allow update, delete: if false; // Ratings cannot be modified once created
+      allow update, delete: if false;
     }
-    
-    // Comments: authenticated users can create, owner/admin can delete
-    match /comments/{commentId} {
-      allow read: if true;
-      allow create: if request.auth != null &&
-         request.auth.uid == resource.data.userID &&
-         resource.data.content.size() > 0 &&
-         resource.data.content.size() <= 500; // Max 500 characters
-      allow update: if request.auth != null && request.auth.uid == resource.data.userID;
-      allow delete: if request.auth != null &&
-         (request.auth.uid == resource.data.userID ||
-          get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true);
-    }
-    
-    // Reports: any authenticated user can create, admin only can update status
+
+    // ---------- REPORTS ----------
     match /reports/{reportId} {
       allow read: if request.auth != null &&
          get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true;
@@ -53,20 +41,80 @@ service cloud.firestore {
          resource.data.reason.size() <= 200;
       allow update: if request.auth != null &&
          get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true;
-      allow delete: if false; // Reports cannot be deleted
+      allow delete: if false;
     }
-    
-    // Gyms: read by all, create/update by admin only
+
+    // ---------- GYMS ----------
     match /gyms/{gymId} {
       allow read: if true;
       allow create, update, delete: if request.auth != null &&
          get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true;
     }
-    
-    // Team data: read by all, no writes (teams are fixed)
+
+    // ---------- TEAMS ----------
     match /teams/{teamId} {
       allow read: if true;
       allow write: if false;
+    }
+
+    // ========== COMMUNITY (NEW) ==========
+
+    // posts/{postId}
+    match /posts/{postId} {
+      allow read: if request.auth != null;
+      // Create: must be owner; validate fields
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.authorId
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 2000
+        && request.resource.data.likeCount == 0
+        && request.resource.data.commentCount == 0
+        && request.resource.data.createdAt == request.time;
+
+      // Update: only allow likeCount/commentCount bump or imageURL set by owner on create
+      allow update: if request.auth != null && (
+        // owner can update their text or image
+        (request.auth.uid == resource.data.authorId
+          && request.resource.data.authorId == resource.data.authorId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 2000)
+        ||
+        // anyone can change counts via atomic increments only
+        (
+          request.resource.data.diff(resource.data).changedKeys().hasOnly(["likeCount","commentCount"]) &&
+          request.writeFields.hasOnly(["likeCount","commentCount"])
+        )
+      );
+
+      // Delete: only owner or coach
+      allow delete: if request.auth != null &&
+        (request.auth.uid == resource.data.authorId ||
+         get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true);
+
+      // Sub: comments
+      match /comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && request.auth.uid == request.resource.data.authorId
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 500
+          && request.resource.data.createdAt == request.time;
+        allow update: if request.auth != null && request.auth.uid == resource.data.authorId;
+        allow delete: if request.auth != null &&
+          (request.auth.uid == resource.data.authorId ||
+           get(/databases/$(db)/documents/users/$(request.auth.uid)).data.isCoach == true);
+      }
+
+      // Sub: likes (presence doc per user)
+      match /likes/{uid} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.createdAt == request.time;
+        allow delete: if request.auth != null && request.auth.uid == uid;
+        allow update: if false;
+      }
     }
   }
 }
