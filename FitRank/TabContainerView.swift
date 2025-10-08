@@ -9,10 +9,11 @@ import SwiftUI
 
 struct TabContainerView: View {
     @StateObject private var userViewModel = UserViewModel()
+    @Binding var showSignInView: Bool 
     
     var body: some View {
         TabView {
-            HomeView()
+            HomeView()//pass this in future showSignInView: $showSignInView)
                 .tabItem {
                     Image(systemName: "house.fill")
                     Text("Home")
@@ -36,7 +37,7 @@ struct TabContainerView: View {
                     Text("Leaderboard")
                 }
             
-            ProfileView()
+            ProfileView(showSignInView: $showSignInView)
                 .tabItem {
                     Image(systemName: "person.fill")
                     Text("Profile")
@@ -47,5 +48,5 @@ struct TabContainerView: View {
 }
 
 #Preview {
-    TabContainerView()
+    TabContainerView(showSignInView: .constant(false))
 }

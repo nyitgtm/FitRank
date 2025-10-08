@@ -17,6 +17,16 @@ struct User: Identifiable, Codable, Equatable {
         case username
         case tokens
     }
+    
+    // Manual initializer
+    init(id: String?, name: String, team: String, isCoach: Bool, username: String, tokens: Int) {
+        self.id = id
+        self.name = name
+        self.team = team
+        self.isCoach = isCoach
+        self.username = username
+        self.tokens = tokens
+    }
 }
 
 // Team reference - now using the Team model from Firestore

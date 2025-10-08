@@ -40,7 +40,6 @@ class UserViewModel: ObservableObject {
         try? await Task.sleep(nanoseconds: 1_000_000_000)
         
         await MainActor.run {
-            self.currentUser = self.generateMockUser()
             self.isLoading = false
         }
     }
@@ -69,31 +68,6 @@ class UserViewModel: ObservableObject {
     private func generateUniqueUsername() -> String {
         let baseUsername = "user\(Int.random(in: 1000...9999))"
         return baseUsername
-    }
-    
-    // MARK: - Mock Data for Development
-    
-    private func generateMockUser() -> User {
-        return User(
-            id: "XXnXHthKKwVN5yfE0knWEPvHnOI2",
-            name: "Fitrank Control",
-            team: "/teams/0",
-            isCoach: true,
-            username: "fitrank",
-            tokens: -1
-        )
-    }
-    
-    func fetchCurrentUser() async {
-        isLoading = true
-        
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        await MainActor.run {
-            self.currentUser = self.generateMockUser()
-            self.isLoading = false
-        }
     }
     
     // MARK: - Profile Updates
@@ -176,17 +150,15 @@ class UserViewModel: ObservableObject {
     func checkAuthenticationStatus() {
         // For development, always show as authenticated with mock data
         isAuthenticated = true
-        currentUser = generateMockUser()
         
-        // In production, this would check Firebase Auth
-        // if let user = Auth.auth().currentUser {
-        //     isAuthenticated = true
-        //     Task {
-        //         await fetchUserProfile(userId: user.uid)
-        //     }
-        // } else {
-        //     isAuthenticated = false
-        //     currentUser = nil
-        // }
+         if let user = Auth.auth().currentUser {
+             isAuthenticated = true
+             Task {
+                 await fetchUserProfile(userId: user.uid)
+             }
+         } else {
+             isAuthenticated = false
+             currentUser = nil
+         }
     }
 }

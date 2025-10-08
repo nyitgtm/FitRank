@@ -9,21 +9,23 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var userViewModel = UserViewModel()
+    @State private var showSignInView = false
     
     var body: some View {
         Group {
-            if userViewModel.isAuthenticated {
-                TabContainerView()
+            if showSignInView {
+                AuthenticationView(showSignInView: $showSignInView)
             } else {
-                // For now, just show the main app since we're using mock data
-                TabContainerView()
+                TabContainerView(showSignInView: $showSignInView)
             }
         }
         .onAppear {
             userViewModel.checkAuthenticationStatus()
+            showSignInView = !userViewModel.isAuthenticated
         }
     }
 }
+
 
 #Preview {
     ContentView()

@@ -1,142 +1,221 @@
 import SwiftUI
+import Foundation
+import FirebaseAuth
+import Combine
 
 struct ProfileView: View {
     @StateObject private var userViewModel = UserViewModel()
     @StateObject private var workoutViewModel = WorkoutViewModel()
-    @State private var showingEditProfile = false
-    @State private var showingTeamSelection = false
+    
+    @Binding var showSignInView: Bool
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Profile Header
-                    ProfileHeaderView(user: userViewModel.currentUser)
-                    
-                    // Stats Section
-                    StatsSectionView(workoutCount: workoutViewModel.workouts.count)
-                    
-                    // Team Section
-                    if let user = userViewModel.currentUser {
-                        TeamSectionView(team: user.team)
+                    ZStack {
+                        Color(.systemGroupedBackground)
+                            .ignoresSafeArea()
+                        
+                        if userViewModel.isLoading {
+                            ProgressView("Loading profile...")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                        } else if let user = userViewModel.currentUser {
+                            ScrollView {
+                                VStack(spacing: 28) {
+                                    
+                                    // Header
+                                    ModernProfileHeaderView(user: user)
+                                    
+                                    // Info Cards
+                                    VStack(spacing: 20) {
+                                        ProfileInfoCard(icon: "person.circle", title: "Full Name", value: user.name)
+                                        ProfileInfoCard(icon: "at", title: "Username", value: "@\(user.username)")
+                                        ProfileInfoCard(icon: "flag", title: "Team", value: user.team)
+                                        ProfileInfoCard(icon: "shield.lefthalf.fill", title: "Role", value: user.isCoach ? "Coach" : "Member")
+                                    }
+                                    
+                                    // Stats Section
+                                    StatsSectionModern(workoutCount: workoutViewModel.workouts.count)
+                                    
+                                    // Sign Out Button
+                                    VStack(spacing: 16) {
+                                        ModernActionButton(
+                                            icon: "rectangle.portrait.and.arrow.right",
+                                            title: "Sign Out",
+                                            color: .red
+                                        ) {
+                                            userViewModel.signOut()
+                                            showSignInView = true
+                                        }
+                                    }
+                                    
+                                    // Recent Workouts
+                                    ModernRecentWorkoutsSection(workouts: workoutViewModel.workouts)
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 30)
+                            }
+                        } else {
+                            ProgressView("Loading profile...")
+                        }
                     }
-                    
-                    // Actions Section
-                    ActionsSectionView(
-                        onEditProfile: { showingEditProfile = true },
-                        onSelectTeam: { showingTeamSelection = true }
-                    )
-                    
-                    // Recent Workouts
-                    RecentWorkoutsSection(workouts: workoutViewModel.workouts)
-                }
-                .padding()
+                    .navigationTitle("Profile")
+                    .navigationBarTitleDisplayMode(.large)
+                    .refreshable {
+                        await loadUserAndWorkouts()
+                    }
+                    .task {
+                        await loadUserAndWorkouts()
+                    }
+        }
+    }
+    
+    // MARK: - Helper function
+    private func loadUserAndWorkouts() async {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            // No authenticated user, show sign in screen
+            print("ProfileView: No authenticated user found")
+            showSignInView = true
+            return
+        }
+        
+        print("ProfileView: Fetching user with UID: \(uid)")
+        
+        do {
+            if let user = try await UserRepository().getUser(uid: uid) {
+                print("ProfileView: User fetched successfully - \(user.username)")
+                userViewModel.currentUser = user
+            } else {
+                // Firestore user not found, show sign in screen
+                print("ProfileView: User document not found in Firestore for UID: \(uid)")
+                showSignInView = true
             }
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.large)
-            .refreshable {
-                await userViewModel.fetchCurrentUser()
-                workoutViewModel.fetchWorkouts()
-            }
+        } catch {
+            print("ProfileView: Error fetching user - \(error.localizedDescription)")
+            print("ProfileView: Full error - \(error)")
+            // Error fetching user, show sign in screen
+            showSignInView = true
         }
-        .sheet(isPresented: $showingEditProfile) {
-            EditProfileView(userViewModel: userViewModel)
-        }
-        .sheet(isPresented: $showingTeamSelection) {
-            TeamSelectionView(userViewModel: userViewModel)
-        }
-        .onAppear {
-            Task {
-                await userViewModel.fetchCurrentUser()
-            }
-            workoutViewModel.fetchWorkouts()
-        }
+        
+        workoutViewModel.fetchWorkouts()
     }
 }
 
-struct ProfileHeaderView: View {
-    let user: User?
+// MARK: - Modernized Components
+
+struct ModernProfileHeaderView: View {
+    let user: User
     
     var body: some View {
         VStack(spacing: 16) {
-            // Profile Image
+            // Profile Picture
             Circle()
-                .fill(Color.blue.gradient)
+                .fill(
+                    LinearGradient(
+                        colors: [.blue, .purple],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .frame(width: 100, height: 100)
                 .overlay(
                     Image(systemName: "person.fill")
                         .font(.system(size: 40))
                         .foregroundColor(.white)
                 )
+                .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
             
-            // User Info
-            VStack(spacing: 8) {
-                Text(user?.name ?? "Loading...")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Text("@\(user?.username ?? "username")")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                if user?.isCoach == true {
-                    HStack {
-                        Image(systemName: "shield.fill")
-                            .foregroundColor(.orange)
-                        Text("Coach")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.orange)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
+            Text(user.name)
+                .font(.title)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+            
+            Text("@\(user.username)")
+                .font(.title3)
+                .foregroundColor(.secondary)
+            
+            if user.isCoach {
+                Label("Coach", systemImage: "shield.fill")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
                     .background(Color.orange.opacity(0.1))
+                    .foregroundColor(.orange)
                     .cornerRadius(12)
-                }
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
+        .padding(.vertical, 20)
     }
 }
 
-struct StatsSectionView: View {
+struct ProfileInfoCard: View {
+    let icon: String
+    let title: String
+    let value: String
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(.blue)
+                .frame(width: 30)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title.uppercased())
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Text(value)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+            }
+            
+            Spacer()
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(.systemGray4), lineWidth: 0.5)
+        )
+    }
+}
+
+struct StatsSectionModern: View {
     let workoutCount: Int
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Stats")
-                .font(.headline)
+                .font(.title2)
                 .fontWeight(.semibold)
             
-            HStack(spacing: 20) {
-                StatCard(title: "Workouts", value: "\(workoutCount)", icon: "dumbbell.fill")
-                StatCard(title: "Tokens", value: "0", icon: "star.fill")
-                StatCard(title: "Team Rank", value: "#1", icon: "trophy.fill")
+            HStack(spacing: 16) {
+                ModernStatCard(title: "Workouts", value: "\(workoutCount)", icon: "dumbbell.fill", color: .blue)
+                ModernStatCard(title: "Tokens", value: "0", icon: "star.fill", color: .yellow)
+                ModernStatCard(title: "Team Rank", value: "#1", icon: "trophy.fill", color: .orange)
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
     }
 }
 
-struct StatCard: View {
+struct ModernStatCard: View {
     let title: String
     let value: String
     let icon: String
+    let color: Color
     
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundColor(.blue)
+                .foregroundColor(color)
             
             Text(value)
-                .font(.title2)
+                .font(.title3)
                 .fontWeight(.bold)
             
             Text(title)
@@ -145,127 +224,60 @@ struct StatCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
+        )
     }
 }
 
-struct TeamSectionView: View {
-    let team: String
-    @StateObject private var teamRepository = TeamRepository()
-    
-    private func getTeamColor(_ team: String) -> Color {
-        if let teamData = teamRepository.getTeam(byReference: team) {
-            return Color(hex: teamData.color) ?? .gray
-        }
-        return .gray
-    }
-    
-    private func getTeamName(_ team: String) -> String {
-        if let teamData = teamRepository.getTeam(byReference: team) {
-            return teamData.name
-        }
-        return "Unknown Team"
-    }
+struct ModernActionButton: View {
+    let icon: String
+    let title: String
+    let color: Color
+    let action: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Team")
-                .font(.headline)
-                .fontWeight(.semibold)
-            
-            HStack {
-                Circle()
-                    .fill(getTeamColor(team))
-                    .frame(width: 40, height: 40)
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundColor(color)
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(getTeamName(team))
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                    
-                    Text("Team Member")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                Text(title)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
                 
                 Spacer()
                 
                 Image(systemName: "chevron.right")
+                    .font(.caption)
                     .foregroundColor(.secondary)
             }
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(.systemGray4), lineWidth: 0.5)
+            )
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
-        .onAppear {
-            Task {
-                await teamRepository.fetchTeams()
-            }
-        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
-struct ActionsSectionView: View {
-    let onEditProfile: () -> Void
-    let onSelectTeam: () -> Void
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Actions")
-                .font(.headline)
-                .fontWeight(.semibold)
-            
-            VStack(spacing: 12) {
-                Button(action: onEditProfile) {
-                    HStack {
-                        Image(systemName: "pencil")
-                            .foregroundColor(.blue)
-                        Text("Edit Profile")
-                            .foregroundColor(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.secondary)
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
-                }
-                
-                Button(action: onSelectTeam) {
-                    HStack {
-                        Image(systemName: "person.2")
-                            .foregroundColor(.green)
-                        Text("Change Team")
-                            .foregroundColor(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.secondary)
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
-                }
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
-    }
-}
-
-struct RecentWorkoutsSection: View {
+struct ModernRecentWorkoutsSection: View {
     let workouts: [Workout]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Recent Workouts")
-                .font(.headline)
+                .font(.title2)
                 .fontWeight(.semibold)
             
             if workouts.isEmpty {
@@ -274,142 +286,33 @@ struct RecentWorkoutsSection: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
             } else {
-                LazyVStack(spacing: 12) {
-                    ForEach(workouts.prefix(5)) { workout in
-                        WorkoutRowView(workout: workout)
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
-    }
-}
-
-struct WorkoutRowView: View {
-    let workout: Workout
-    
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(workout.liftType.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                
-                Text("\(workout.weight) lbs")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            Text(workout.createdAt, style: .relative)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Helper Views
-
-struct EditProfileView: View {
-    @ObservedObject var userViewModel: UserViewModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    @State private var username = ""
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section("Profile Information") {
-                    TextField("Name", text: $name)
-                    TextField("Username", text: $username)
-                }
-            }
-            .navigationTitle("Edit Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        Task {
-                            await userViewModel.updateProfile(name: name, username: username)
-                            dismiss()
+                ForEach(workouts.prefix(5)) { workout in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(workout.liftType.displayName)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text("\(workout.weight) lbs")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
+                        Spacer()
+                        Text(workout.createdAt, style: .relative)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.systemBackground))
+                            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+                    )
                 }
-            }
-        }
-        .onAppear {
-            if let user = userViewModel.currentUser {
-                name = user.name
-                username = user.username
-            }
-        }
-    }
-}
-
-struct TeamSelectionView: View {
-    @ObservedObject var userViewModel: UserViewModel
-    @Environment(\.dismiss) private var dismiss
-    @StateObject private var teamRepository = TeamRepository()
-    
-    var body: some View {
-        NavigationView {
-            List {
-                ForEach(teamRepository.teams, id: \.id) { team in
-                    Button {
-                        Task {
-                            await userViewModel.updateTeam(team: "/teams/\(team.id ?? "")")
-                            dismiss()
-                        }
-                    } label: {
-                        HStack {
-                            Circle()
-                                .fill(Color(hex: team.color) ?? .gray)
-                                .frame(width: 20, height: 20)
-                            
-                            Text(team.name)
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                            
-                            if userViewModel.currentUser?.team == "/teams/\(team.id ?? "")" {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Select Team")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .onAppear {
-            Task {
-                await teamRepository.fetchTeams()
             }
         }
     }
 }
 
 #Preview {
-    ProfileView()
+    ProfileView(showSignInView: .constant(false))
 }
