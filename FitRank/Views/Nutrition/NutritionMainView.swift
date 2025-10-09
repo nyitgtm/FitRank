@@ -52,13 +52,17 @@ struct NutritionMainView: View {
                             subtitle: "Coming Soon",
                             color: .gray
                         )
-                        
-                        FeatureCard(
-                            icon: "magnifyingglass",
-                            title: "Food Database",
-                            subtitle: "Coming Soon",
-                            color: .gray
-                        )
+                        NavigationLink {
+                                FoodDatabaseView()
+                            } label: {
+                                FeatureCard(
+                                    icon: "magnifyingglass",
+                                    title: "Food Database",
+                                    subtitle: "Search foods & nutrients",
+                                    color: .green
+                                )
+                            }
+
                         
                         FeatureCard(
                             icon: "chart.bar.fill",
