@@ -53,15 +53,16 @@ struct NutritionMainView: View {
                             color: .gray
                         )
                         NavigationLink {
-                                FoodDatabaseView()
+                                FoodDataMainView()
                             } label: {
                                 FeatureCard(
                                     icon: "magnifyingglass",
                                     title: "Food Database",
                                     subtitle: "Search foods & nutrients",
-                                    color: .green
+                                    color: .blue
                                 )
                             }
+                            .buttonStyle(PlainButtonStyle())
 
                         
                         FeatureCard(
