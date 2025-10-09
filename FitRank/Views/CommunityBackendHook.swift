@@ -5,17 +5,6 @@ import FirebaseStorage
 
 // MARK: - Models (single source of truth)
 
-struct CommunityNotification: Identifiable, Hashable {
-    let id: UUID = UUID()
-    var backendId: String          // Firestore notification doc id
-    var type: String               // "like" or "comment"
-    var actorId: String            // who performed the action
-    var actorName: String
-    var postId: String             // which post
-    var postText: String           // preview of post
-    var isRead: Bool
-    var createdAt: Date
-}
 
 struct CommunityComment: Identifiable, Hashable {
     let id: UUID = UUID()
@@ -43,6 +32,17 @@ struct CommunityPost: Identifiable, Hashable {
     var comments: [CommunityComment] = []
 }
 
+struct CommunityNotification: Identifiable, Hashable {
+    let id: UUID = UUID()
+    var backendId: String          // Firestore notification doc id
+    var type: String               // "like" or "comment"
+    var actorId: String            // who performed the action
+    var actorName: String
+    var postId: String             // which post
+    var postText: String           // preview of post
+    var isRead: Bool
+    var createdAt: Date
+}
 
 
 // MARK: - Minimal Firebase Community Service
@@ -53,15 +53,17 @@ final class CommunityService {
     private let db = Firestore.firestore()
     private init() {}
 
-    public var feedListener: ListenerRegistration?
-    private var commentsListener: ListenerRegistration?
-    private var notificationsListener: ListenerRegistration?
-    
+   public var feedListener: ListenerRegistration?
     func deleteComment(postId: String, commentId: String) async throws {
         let postRef = db.collection("posts").document(postId)
         try await postRef.collection("comments").document(commentId).delete()
         try await postRef.updateData(["commentCount": FieldValue.increment(Int64(-1))])
     }
+    // 1) Add this property near the top of CommunityService (with feedListener)
+    private var commentsListener: ListenerRegistration?
+    private var notificationsListener: ListenerRegistration?
+
+    // 2) Add these methods anywhere inside CommunityService:
 
     // Live comments for a post
     func startComments(postId: String, onChange: @escaping ([CommunityComment]) -> Void) {
@@ -89,7 +91,9 @@ final class CommunityService {
         commentsListener?.remove()
         commentsListener = nil
     }
-    
+
+    // Delete a single comment and decrement counter
+   
     // MARK: - Notifications
     
     func startNotifications(onChange: @escaping ([CommunityNotification]) -> Void) {
@@ -152,7 +156,7 @@ final class CommunityService {
                     let data = doc.data()
                     return CommunityFeedItem(
                         id: doc.documentID,
-                        authorId: data["authorId"] as? String ?? "",
+                        authorId: data["authorId"] as? String ?? "",         // ✅
                         authorName: data["authorName"] as? String ?? "User",
                         teamTag: data["teamTag"] as? String,
                         text: data["text"] as? String ?? "",
@@ -331,7 +335,7 @@ final class CommunityVM_Firebase: ObservableObject {
                     mapped.append(
                         CommunityPost(
                             backendId: it.id,
-                            authorId: it.authorId,
+                            authorId: it.authorId, // Fixed: was empty string
                             authorName: it.authorName,
                             teamTag: it.teamTag,
                             text: it.text,
@@ -365,6 +369,7 @@ final class CommunityVM_Firebase: ObservableObject {
             CommunityService.shared.stopNotifications()
         }
     }
+
 
     func publishDraft() {
         let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -421,6 +426,7 @@ final class CommunityVM_Firebase: ObservableObject {
                 try await svc.deletePost(postId: id)
             } catch {
                 print("Failed to delete post: \(error)")
+                // Could re-fetch or show error here
             }
         }
     }

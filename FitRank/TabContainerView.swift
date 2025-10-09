@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TabContainerView: View {
     @StateObject private var userViewModel = UserViewModel()
+    @StateObject private var themeManager = ThemeManager.shared
     @Binding var showSignInView: Bool 
     
     var body: some View {
@@ -44,6 +45,11 @@ struct TabContainerView: View {
                 }
         }
         .accentColor(.blue)
+        .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
+        .onAppear {
+            // Load theme from Firebase when app starts
+            themeManager.loadFromFirebase()
+        }
     }
 }
 

@@ -6,6 +6,7 @@ import Combine
 struct ProfileView: View {
     @StateObject private var userViewModel = UserViewModel()
     @StateObject private var workoutViewModel = WorkoutViewModel()
+    @StateObject private var themeManager = ThemeManager.shared
     
     @Binding var showSignInView: Bool
     
@@ -37,6 +38,9 @@ struct ProfileView: View {
                                     // Stats Section
                                     StatsSectionModern(workoutCount: workoutViewModel.workouts.count)
                                     
+                                    // Dark Mode Toggle
+                                    DarkModeToggleCard(isDarkMode: $themeManager.isDarkMode)
+                                    
                                     // Sign Out Button
                                     VStack(spacing: 16) {
                                         ModernActionButton(
@@ -67,6 +71,7 @@ struct ProfileView: View {
                     .task {
                         await loadUserAndWorkouts()
                     }
+                    .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
         }
     }
     
@@ -85,6 +90,12 @@ struct ProfileView: View {
             if let user = try await UserRepository().getUser(uid: uid) {
                 print("ProfileView: User fetched successfully - \(user.username)")
                 userViewModel.currentUser = user
+                
+                // Load dark mode preference from user profile
+                if let isDarkMode = user.isDarkMode {
+                    themeManager.isDarkMode = isDarkMode
+                    print("✅ Loaded dark mode from user profile: \(isDarkMode)")
+                }
             } else {
                 // Firestore user not found, show sign in screen
                 print("ProfileView: User document not found in Firestore for UID: \(uid)")
@@ -309,6 +320,51 @@ struct ModernRecentWorkoutsSection: View {
                     )
                 }
             }
+        }
+    }
+}
+
+// MARK: - Dark Mode Toggle Card
+
+struct DarkModeToggleCard: View {
+    @Binding var isDarkMode: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Appearance")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            HStack(spacing: 16) {
+                Image(systemName: isDarkMode ? "moon.fill" : "sun.max.fill")
+                    .font(.title2)
+                    .foregroundColor(isDarkMode ? .purple : .orange)
+                    .frame(width: 30)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("DARK MODE")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Text(isDarkMode ? "Enabled" : "Disabled")
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                }
+                
+                Spacer()
+                
+                Toggle("", isOn: $isDarkMode)
+                    .labelsHidden()
+                    .tint(.blue)
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(.systemGray4), lineWidth: 0.5)
+            )
         }
     }
 }

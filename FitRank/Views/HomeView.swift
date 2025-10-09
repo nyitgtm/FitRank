@@ -5,9 +5,14 @@ struct HomeView: View {
     @StateObject private var workoutViewModel = WorkoutViewModel()
     @StateObject private var userViewModel = UserViewModel()
     @StateObject private var gymRepository = GymRepository()
+    @StateObject private var friendRequestVM = FriendRequestViewModel()
+    @StateObject private var friendsVM = FriendsListViewModel()
     @State private var selectedFilter: WorkoutFilter = .all
     @State private var showingUpload = false
     @State private var showingLeaderboard = false
+    @State private var showingUserSearch = false
+    @State private var showingFriendRequests = false
+    @State private var showingFriendsList = false
     @State private var showingFullScreenHeatmap = false
     @State private var hasLoadedGyms = false
 
@@ -40,9 +45,15 @@ struct HomeView: View {
                         ForEach(WorkoutFilter.allCases, id: \.self) { filter in
                             FilterTabView(
                                 filter: filter,
-                                isSelected: selectedFilter == filter
+                                isSelected: selectedFilter == filter,
+                                friendsCount: filter == .following ? friendsVM.friends.count : nil
                             ) {
-                                selectedFilter = filter
+                                if filter == .following {
+                                    // Show friends list popup when tapping Following
+                                    showingFriendsList = true
+                                } else {
+                                    selectedFilter = filter
+                                }
                             }
                         }
                     }
@@ -157,22 +168,65 @@ struct HomeView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showingUpload = true } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
+                    HStack(spacing: 12) {
+                        // Friend Requests Bell with badge
+                        Button {
+                            showingFriendRequests = true
+                        } label: {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: friendRequestVM.unreadCount > 0 ? "bell.badge.fill" : "bell.fill")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(friendRequestVM.unreadCount > 0 ? .blue : .secondary)
+                                
+                                if friendRequestVM.unreadCount > 0 {
+                                    Text("\(friendRequestVM.unreadCount)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .frame(minWidth: 16, minHeight: 16)
+                                        .background(Color.red)
+                                        .clipShape(Circle())
+                                        .offset(x: 8, y: -8)
+                                }
+                            }
+                        }
+                        
+                        // Search button
+                        Button {
+                            showingUserSearch = true
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        // Upload button
+                        Button { showingUpload = true } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
+                        }
                     }
                 }
             }
         }
         .sheet(isPresented: $showingUpload) { UploadView() }
         .sheet(isPresented: $showingLeaderboard) { LeaderboardView() }
+        .sheet(isPresented: $showingUserSearch) {
+            UserSearchView()
+        }
+        .sheet(isPresented: $showingFriendRequests) {
+            FriendRequestNotificationsView()
+        }
+        .sheet(isPresented: $showingFriendsList) {
+            FriendsListView()
+        }
         .fullScreenCover(isPresented: $showingFullScreenHeatmap) {
             FullScreenHeatmapView(isPresented: $showingFullScreenHeatmap, gymRepository: gymRepository)
         }
         .onAppear {
             workoutViewModel.fetchWorkouts()
-            // Fetch gyms immediately on view appear
             gymRepository.fetchGyms()
+            friendRequestVM.loadFriendRequests()
+            friendsVM.loadFriends()
         }
         .onChange(of: gymRepository.gyms.count) { oldValue, newValue in
             if newValue > 0 {
@@ -184,6 +238,8 @@ struct HomeView: View {
 
 // Sleek FitRank header with dark gym aesthetic
 struct FitRankHeaderView: View {
+    @Environment(\.colorScheme) var colorScheme
+    
     var body: some View {
         HStack(spacing: 12) {
             // Dark metallic dumbbell icon
@@ -205,18 +261,22 @@ struct FitRankHeaderView: View {
                 
                 Image(systemName: "dumbbell.fill")
                     .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(colorScheme == .dark ? .black : .white)
             }
             
-            // FitRank text with dark red/orange gradient
+            // FitRank text - adaptive to dark mode
             Text("FitRank")
                 .font(.system(size: 45, weight: .black, design: .rounded))
                 .foregroundStyle(
                     LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color(red: 0.15, green: 0.15, blue: 0.15),      // Dark gray (start)
-                            Color(red: 0.3, green: 0.32, blue: 0.35),       // Darker medium (middle)
-                            Color(red: 0.42, green: 0.44, blue: 0.47)       // Subdued silver (end)
+                        gradient: Gradient(colors: colorScheme == .dark ? [
+                            Color.white,
+                            Color(red: 0.85, green: 0.85, blue: 0.85),
+                            Color(red: 0.7, green: 0.7, blue: 0.7)
+                        ] : [
+                            Color(red: 0.15, green: 0.15, blue: 0.15),
+                            Color(red: 0.3, green: 0.32, blue: 0.35),
+                            Color(red: 0.42, green: 0.44, blue: 0.47)
                         ]),
                         startPoint: .leading,
                         endPoint: .trailing
@@ -253,18 +313,27 @@ struct FitRankHeaderView: View {
 struct FilterTabView: View {
     let filter: HomeView.WorkoutFilter
     let isSelected: Bool
+    let friendsCount: Int?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(filter.rawValue)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(isSelected ? .white : filter.color)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(isSelected ? filter.color : filter.color.opacity(0.1))
-                .cornerRadius(16)
+            HStack(spacing: 4) {
+                Text(filter.rawValue)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                if let count = friendsCount, count > 0 {
+                    Text("(\(count))")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                }
+            }
+            .foregroundColor(isSelected ? .white : filter.color)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(isSelected ? filter.color : filter.color.opacity(0.1))
+            .cornerRadius(16)
         }
     }
 }
@@ -380,7 +449,7 @@ struct FullScreenHeatmapView: View {
                         .shadow(color: .black.opacity(0.4), radius: 5, x: 0, y: 2)
                     }
                     .padding(.leading, 20)
-                    .padding(.top, 30) //change padding
+                    .padding(.top, 30)
                     
                     Spacer()
                 }
