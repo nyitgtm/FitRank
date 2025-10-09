@@ -123,7 +123,7 @@ struct WorkoutCardView: View {
                 Spacer()
                 
                 // Status badge
-                StatusBadgeView(status: workout.status)
+                StatusBadgeView(status: workout.statusEnum)
             }
             
             // Video placeholder
@@ -135,7 +135,7 @@ struct WorkoutCardView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(workout.liftType.displayName)
+                        Text(workout.liftTypeEnum.displayName)
                             .font(.title3)
                             .fontWeight(.bold)
                         
@@ -231,7 +231,8 @@ struct WorkoutCardView: View {
         teamId: "/teams/0",
         videoUrl: "https://example.com/video.mp4",
         weight: 225,
-        liftType: .bench,
-        gymId: "gym1"
+        liftType: "bench",
+        gymId: "gym1",
+        status: "published"
     ))
 }

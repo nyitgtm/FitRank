@@ -60,7 +60,7 @@ class FirebaseService: ObservableObject {
 
     func getWorkouts(limit: Int = 50) async throws -> [Workout] {
         let snapshot = try await db.collection("workouts")
-            .whereField("status", isEqualTo: WorkoutStatus.published.rawValue)
+            .whereField("status", isEqualTo: "published")
             .order(by: "createdAt", descending: true)
             .limit(to: limit)
             .getDocuments()
@@ -70,10 +70,23 @@ class FirebaseService: ObservableObject {
     func getWorkoutsByTeam(teamId: String, limit: Int = 50) async throws -> [Workout] {
         let snapshot = try await db.collection("workouts")
             .whereField("teamId", isEqualTo: teamId)
-            .whereField("status", isEqualTo: WorkoutStatus.published.rawValue)
+            .whereField("status", isEqualTo: "published")
             .order(by: "createdAt", descending: true)
             .limit(to: limit)
             .getDocuments()
+        return try snapshot.documents.compactMap { try $0.data(as: Workout.self) }
+    }
+
+    func getWorkoutsByUser(userId: String, limit: Int? = nil) async throws -> [Workout] {
+        var query = db.collection("workouts")
+            .whereField("userId", isEqualTo: userId)
+            .order(by: "createdAt", descending: true)
+        
+        if let limit = limit {
+            query = query.limit(to: limit)
+        }
+        
+        let snapshot = try await query.getDocuments()
         return try snapshot.documents.compactMap { try $0.data(as: Workout.self) }
     }
 

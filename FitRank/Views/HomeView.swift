@@ -51,95 +51,68 @@ struct HomeView: View {
                 .padding(.vertical, 12)
 
                 // Workout feed
-                if workoutViewModel.isLoading {
-                    Spacer()
-                    ProgressView("Loading workouts...")
-                        .scaleEffect(1.2)
-                    Spacer()
-                } else if workoutViewModel.workouts.isEmpty {
-                    Spacer()
-                    VStack(spacing: 16) {
-                        Image(systemName: "dumbbell.fill")
-                            .font(.system(size: 48))
-                            .foregroundColor(.secondary)
-
-                        Text("No workouts yet")
-                            .font(.title2).fontWeight(.medium)
-                            .foregroundColor(.primary)
-
-                        Text("Be the first to upload a workout!")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-
-                        Button("Upload Workout") { showingUpload = true }
-                            .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
-                    Spacer()
-                } else {
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            // Workout cards
-                            ForEach(workoutViewModel.workouts) { workout in
-                                WorkoutCardView(workout: workout)
-                                    .padding(.horizontal, 20)
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // My Workouts Section (Top 3 recent)
+                        MyWorkoutsSection(
+                            workoutViewModel: workoutViewModel,
+                            userViewModel: userViewModel
+                        )
+                        .padding(.top, 8)
+                        
+                        // Heatmap section at the bottom
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "map.fill")
+                                    .foregroundColor(.blue)
+                                Text("Gym Heatmap")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                Spacer()
                             }
+                            .padding(.horizontal, 20)
                             
-                            // Heatmap section at the bottom
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Image(systemName: "map.fill")
-                                        .foregroundColor(.blue)
-                                    Text("Gym Heatmap")
-                                        .font(.headline)
-                                        .fontWeight(.semibold)
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 20)
-                                
-                                // Loading state or mini heatmap preview
-                                if !hasLoadedGyms {
-                                    HeatmapLoadingBox()
-                                        .frame(height: 300)
-                                        .padding(.horizontal, 20)
-                                } else {
-                                    // Mini heatmap preview (clickable)
-                                    Heatmap(gymRepository: gymRepository)
-                                        .frame(height: 300)
-                                        .cornerRadius(16)
-                                        .padding(.horizontal, 20)
-                                        .onTapGesture {
-                                            showingFullScreenHeatmap = true
-                                        }
-                                        .overlay(
-                                            // Subtle tap hint overlay
-                                            VStack {
+                            // Loading state or mini heatmap preview
+                            if !hasLoadedGyms {
+                                HeatmapLoadingBox()
+                                    .frame(height: 300)
+                                    .padding(.horizontal, 20)
+                            } else {
+                                // Mini heatmap preview (clickable)
+                                Heatmap(gymRepository: gymRepository)
+                                    .frame(height: 300)
+                                    .cornerRadius(16)
+                                    .padding(.horizontal, 20)
+                                    .onTapGesture {
+                                        showingFullScreenHeatmap = true
+                                    }
+                                    .overlay(
+                                        // Subtle tap hint overlay
+                                        VStack {
+                                            Spacer()
+                                            HStack {
                                                 Spacer()
-                                                HStack {
-                                                    Spacer()
-                                                    HStack(spacing: 4) {
-                                                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                                            .font(.caption2)
-                                                        Text("Tap to expand")
-                                                            .font(.caption2)
-                                                            .fontWeight(.medium)
-                                                    }
-                                                    .foregroundColor(.white)
-                                                    .padding(.horizontal, 10)
-                                                    .padding(.vertical, 6)
-                                                    .background(.ultraThinMaterial)
-                                                    .cornerRadius(12)
-                                                    .padding(12)
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                                        .font(.caption2)
+                                                    Text("Tap to expand")
+                                                        .font(.caption2)
+                                                        .fontWeight(.medium)
                                                 }
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 6)
+                                                .background(.ultraThinMaterial)
+                                                .cornerRadius(12)
+                                                .padding(12)
                                             }
-                                        )
-                                }
+                                        }
+                                    )
                             }
-                            .padding(.vertical, 16)
                         }
                         .padding(.vertical, 16)
                     }
+                    .padding(.bottom, 16)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -170,7 +143,9 @@ struct HomeView: View {
             FullScreenHeatmapView(isPresented: $showingFullScreenHeatmap, gymRepository: gymRepository)
         }
         .onAppear {
-            workoutViewModel.fetchWorkouts()
+            // Check authentication status and load user
+            userViewModel.checkAuthenticationStatus()
+            
             // Fetch gyms immediately on view appear
             gymRepository.fetchGyms()
         }
@@ -380,7 +355,7 @@ struct FullScreenHeatmapView: View {
                         .shadow(color: .black.opacity(0.4), radius: 5, x: 0, y: 2)
                     }
                     .padding(.leading, 20)
-                    .padding(.top, 30) //change padding
+                    .padding(.top, 30)
                     
                     Spacer()
                 }

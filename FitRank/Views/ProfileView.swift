@@ -35,7 +35,7 @@ struct ProfileView: View {
                                     }
                                     
                                     // Stats Section
-                                    StatsSectionModern(workoutCount: workoutViewModel.workouts.count)
+                                    StatsSectionModern(workoutCount: workoutViewModel.userWorkouts.count)
                                     
                                     // Sign Out Button
                                     VStack(spacing: 16) {
@@ -50,7 +50,7 @@ struct ProfileView: View {
                                     }
                                     
                                     // Recent Workouts
-                                    ModernRecentWorkoutsSection(workouts: workoutViewModel.workouts)
+                                    ModernRecentWorkoutsSection(workouts: workoutViewModel.userWorkouts)
                                 }
                                 .padding(.horizontal, 20)
                                 .padding(.vertical, 30)
@@ -85,6 +85,9 @@ struct ProfileView: View {
             if let user = try await UserRepository().getUser(uid: uid) {
                 print("ProfileView: User fetched successfully - \(user.username)")
                 userViewModel.currentUser = user
+                
+                // Fetch actual user workouts
+                await workoutViewModel.fetchAllUserWorkouts(userId: uid)
             } else {
                 // Firestore user not found, show sign in screen
                 print("ProfileView: User document not found in Firestore for UID: \(uid)")
@@ -96,8 +99,6 @@ struct ProfileView: View {
             // Error fetching user, show sign in screen
             showSignInView = true
         }
-        
-        workoutViewModel.fetchWorkouts()
     }
 }
 
@@ -281,15 +282,26 @@ struct ModernRecentWorkoutsSection: View {
                 .fontWeight(.semibold)
             
             if workouts.isEmpty {
-                Text("No workouts yet")
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding()
+                VStack(spacing: 12) {
+                    Image(systemName: "dumbbell")
+                        .font(.system(size: 40))
+                        .foregroundColor(.secondary)
+                    
+                    Text("No workouts yet")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemGray6))
+                )
             } else {
                 ForEach(workouts.prefix(5)) { workout in
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(workout.liftType.displayName)
+                            Text(workout.liftTypeEnum.displayName)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                             Text("\(workout.weight) lbs")
