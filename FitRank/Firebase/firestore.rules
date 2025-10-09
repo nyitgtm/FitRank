@@ -7,6 +7,14 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
       allow delete: if false; // Users cannot delete their profiles
+      
+      // Meal logs: only the owner can read and write their meal logs
+      match /mealLogs/{logId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
     
     // Workouts: any user can read published ones, only owner or admin can update/delete

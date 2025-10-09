@@ -15,6 +15,7 @@
 		C3EBD7F82DF501F3005FE241 /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = C3EBD7F72DF501F3005FE241 /* FirebaseAnalyticsIdentitySupport */; };
 		C3EBD7FA2DF501F3005FE241 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = C3EBD7F92DF501F3005FE241 /* FirebaseAnalyticsOnDeviceConversion */; };
 		C3EBD7FD2DF50873005FE241 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = C3EBD7FC2DF50873005FE241 /* FirebaseAuth */; };
+		E6E99F412E9606E1003ED881 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = E6E99F402E9606E1003ED881 /* FirebaseStorage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +71,7 @@
 				C3EBD7F42DF501F3005FE241 /* FirebaseAnalytics in Frameworks */,
 				C3EBD7FA2DF501F3005FE241 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
 				C3EBD7F62DF501F3005FE241 /* FirebaseAnalyticsCore in Frameworks */,
+				E6E99F412E9606E1003ED881 /* FirebaseStorage in Frameworks */,
 				C3EBD7F22DF501F3005FE241 /* FirebaseAI in Frameworks */,
 				C3071C1E2E4994F10013D4AB /* FirebaseFirestore in Frameworks */,
 			);
@@ -149,6 +151,7 @@
 				C3EBD7F92DF501F3005FE241 /* FirebaseAnalyticsOnDeviceConversion */,
 				C3EBD7FC2DF50873005FE241 /* FirebaseAuth */,
 				C3071C1D2E4994F10013D4AB /* FirebaseFirestore */,
+				E6E99F402E9606E1003ED881 /* FirebaseStorage */,
 			);
 			productName = FitRank;
 			productReference = C38A48872DF3F7BD0064D3C3 /* FitRank.app */;
@@ -687,6 +690,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C3C417712DF4FF8A00ABFADE /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
+		};
+		E6E99F402E9606E1003ED881 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C3C417712DF4FF8A00ABFADE /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
