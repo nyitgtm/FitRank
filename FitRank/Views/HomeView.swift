@@ -53,7 +53,7 @@ struct HomeView: View {
 
                 // Workout feed
                 ScrollView {
-                    VStack(spacing: 24) {
+                    VStack(spacing: 20) {
                         // My Workouts Section (Top 3 recent)
                         MyWorkoutsSection(
                             workoutViewModel: workoutViewModel,

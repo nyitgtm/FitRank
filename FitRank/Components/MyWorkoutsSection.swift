@@ -6,7 +6,7 @@ struct MyWorkoutsSection: View {
     @State private var showingAllWorkouts = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             // Section header
             HStack {
                 Image(systemName: "figure.strengthtraining.traditional")
@@ -46,19 +46,22 @@ struct MyWorkoutsSection: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    .padding(.vertical, 40)
+                    .frame(height: 200)
                     Spacer()
                 }
             } else if workoutViewModel.userWorkouts.isEmpty {
                 EmptyWorkoutsCard()
                     .padding(.horizontal, 20)
             } else {
-                // Show top 3 workouts
-                VStack(spacing: 16) {
-                    ForEach(workoutViewModel.userWorkouts) { workout in
-                        WorkoutCardView(workout: workout)
-                            .padding(.horizontal, 20)
+                // Horizontal scrolling workout cards
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(workoutViewModel.userWorkouts) { workout in
+                            CompactWorkoutCard(workout: workout)
+                        }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 4)
                 }
             }
         }
@@ -105,10 +108,11 @@ struct EmptyWorkoutsCard: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .padding(.horizontal, 20)
-        .background(Color(.systemGray6))
-        .cornerRadius(16)
+        .frame(height: 200)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemGray6))
+        )
     }
 }
 
