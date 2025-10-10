@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import FirebaseAuth
 
 struct HomeView: View {
     @StateObject private var workoutViewModel = WorkoutViewModel()
@@ -142,11 +143,13 @@ struct HomeView: View {
         .fullScreenCover(isPresented: $showingFullScreenHeatmap) {
             FullScreenHeatmapView(isPresented: $showingFullScreenHeatmap, gymRepository: gymRepository)
         }
-        .onAppear {
-            // Check authentication status and load user
-            userViewModel.checkAuthenticationStatus()
+        .task {
+            // Ensure user is loaded on first appear
+            if let userId = Auth.auth().currentUser?.uid {
+                await userViewModel.fetchUserProfile(userId: userId)
+            }
             
-            // Fetch gyms immediately on view appear
+            // Fetch gyms
             gymRepository.fetchGyms()
         }
         .onChange(of: gymRepository.gyms.count) { oldValue, newValue in

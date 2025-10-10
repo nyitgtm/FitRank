@@ -78,6 +78,13 @@ struct MyWorkoutsSection: View {
                 }
             }
         }
+        .onChange(of: userViewModel.currentUser?.id) { oldValue, newValue in
+            if let userId = newValue {
+                Task {
+                    await workoutViewModel.fetchTop3UserWorkouts(userId: userId)
+                }
+            }
+        }
     }
 }
 
