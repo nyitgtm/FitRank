@@ -70,7 +70,8 @@ struct MyWorkoutsSection: View {
                 UserWorkoutsView(
                     workoutViewModel: workoutViewModel,
                     userId: userId,
-                    userName: userViewModel.currentUser?.name ?? "User"
+                    userName: userViewModel.currentUser?.name ?? "User",
+                    userUsername: userViewModel.currentUser?.username ?? "user"
                 )
             }
         }

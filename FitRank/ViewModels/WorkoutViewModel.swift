@@ -80,6 +80,20 @@ class WorkoutViewModel: ObservableObject {
         await fetchUserWorkouts(userId: userId, limit: nil)
     }
     
+    // MARK: - Delete Workout
+    
+    func deleteWorkout(_ workout: Workout) async {
+        guard let workoutId = workout.id else { return }
+        
+        do {
+            try await firebaseService.deleteWorkout(workoutId: workoutId)
+            // Remove from local array
+            userWorkouts.removeAll { $0.id == workoutId }
+        } catch {
+            errorMessage = "Failed to delete workout: \(error.localizedDescription)"
+        }
+    }
+    
     // MARK: - Workout Creation
     
     func createWorkout(weight: Int, liftType: String, gymId: String, videoURL: URL) async {
