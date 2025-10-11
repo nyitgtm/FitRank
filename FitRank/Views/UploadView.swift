@@ -15,6 +15,7 @@ struct UploadView: View {
     @State private var showingVideoPicker = false
     @State private var showingGymPicker = false
     @State private var showingSuccessAlert = false
+    @State private var showingConfetti = false
     @State private var motivationalTip = ""
     
     // Plate counter state
@@ -23,6 +24,8 @@ struct UploadView: View {
     @State private var plate10Count = 0
     @State private var plate5Count = 0
     @State private var plate2_5Count = 0
+    @State private var manualWeight = ""
+    @State private var useManualWeight = false
     
     let motivationalTips = [
         "Don't hurt yourself! Safety first always 💪",
@@ -37,9 +40,16 @@ struct UploadView: View {
     ]
     
     private var totalWeight: Int {
+        if useManualWeight, let weight = Int(manualWeight), weight > 0 {
+            return weight
+        }
         let barbellWeight = 45
         let platesPerSide = (plate45Count * 45) + (plate25Count * 25) + (plate10Count * 10) + (plate5Count * 5) + (plate2_5Count * 2)
         return barbellWeight + (platesPerSide * 2) // Both sides
+    }
+    
+    private var totalPlatesPerSide: Int {
+        return plate45Count + plate25Count + plate10Count + plate5Count + plate2_5Count
     }
     
     private var canUpload: Bool {
@@ -56,54 +66,60 @@ struct UploadView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Video Upload Section
-                    VideoUploadSection(
-                        videoURL: $videoURL,
-                        showingCamera: $showingCamera,
-                        showingVideoPicker: $showingVideoPicker
-                    )
-                    
-                    // Weight Plate Calculator
-                    WeightPlateCalculator(
-                        plate45: $plate45Count,
-                        plate25: $plate25Count,
-                        plate10: $plate10Count,
-                        plate5: $plate5Count,
-                        plate2_5: $plate2_5Count,
-                        totalWeight: totalWeight
-                    )
-                    
-                    // Lift Type Selector
-                    LiftTypeSelector(selectedLiftType: $selectedLiftType)
-                    
-                    // Gym Selector
-                    GymSelector(
-                        selectedGym: $selectedGym,
-                        closestGym: closestGym,
-                        showingGymPicker: $showingGymPicker
-                    )
-                    
-                    // Upload Button
-                    ModernUploadButton(
-                        canUpload: canUpload,
-                        isLoading: workoutViewModel.isLoading,
-                        onUpload: uploadWorkout
-                    )
+            ZStack {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Video Upload Section
+                        VideoUploadSection(
+                            videoURL: $videoURL,
+                            showingCamera: $showingCamera,
+                            showingVideoPicker: $showingVideoPicker
+                        )
+                        
+                        // Weight Plate Calculator
+                        WeightPlateCalculator(
+                            plate45: $plate45Count,
+                            plate25: $plate25Count,
+                            plate10: $plate10Count,
+                            plate5: $plate5Count,
+                            plate2_5: $plate2_5Count,
+                            manualWeight: $manualWeight,
+                            useManualWeight: $useManualWeight,
+                            totalWeight: totalWeight,
+                            totalPlatesPerSide: totalPlatesPerSide
+                        )
+                        
+                        // Lift Type Selector
+                        LiftTypeSelector(selectedLiftType: $selectedLiftType)
+                        
+                        // Gym Selector
+                        GymSelector(
+                            selectedGym: $selectedGym,
+                            closestGym: closestGym,
+                            showingGymPicker: $showingGymPicker
+                        )
+                        
+                        // Upload Button
+                        ModernUploadButton(
+                            canUpload: canUpload,
+                            isLoading: workoutViewModel.isLoading,
+                            onUpload: uploadWorkout
+                        )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Upload Workout")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+                .background(Color(.systemGroupedBackground))
+                .navigationTitle("Upload Workout")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
                     }
                 }
+                
             }
         }
         .sheet(isPresented: $showingCamera) {
@@ -147,10 +163,32 @@ struct UploadView: View {
                 videoURL: videoURL
             )
             
-            // Show success with random tip
+            // Show confetti
+            showingConfetti = true
+            
+            // Show success with random tip after a brief delay
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             motivationalTip = motivationalTips.randomElement() ?? motivationalTips[0]
             showingSuccessAlert = true
+            
+            // Reset form after confetti
+            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+            resetForm()
         }
+    }
+    
+    private func resetForm() {
+        videoURL = nil
+        selectedLiftType = .bench
+        plate45Count = 0
+        plate25Count = 0
+        plate10Count = 0
+        plate5Count = 0
+        plate2_5Count = 0
+        manualWeight = ""
+        useManualWeight = false
+        showingConfetti = false
+        // selectedGym stays the same (keep last selected gym)
     }
 }
 
@@ -261,11 +299,16 @@ struct WeightPlateCalculator: View {
     @Binding var plate10: Int
     @Binding var plate5: Int
     @Binding var plate2_5: Int
+    @Binding var manualWeight: String
+    @Binding var useManualWeight: Bool
     let totalWeight: Int
+    let totalPlatesPerSide: Int
+    
+    private let maxPlatesForVisualization = 9 // 9 per side = 18 total
     
     var body: some View {
         VStack(spacing: 16) {
-            // Header with total weight
+            // Header with total weight and toggle
             HStack {
                 Text("Weight")
                     .font(.headline)
@@ -273,35 +316,103 @@ struct WeightPlateCalculator: View {
                 
                 Spacer()
                 
-                Text("\(totalWeight) lbs")
-                    .font(.system(size: 32, weight: .black, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.blue, .purple],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                Button {
+                    useManualWeight.toggle()
+                    if useManualWeight {
+                        manualWeight = "\(totalWeight)"
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: useManualWeight ? "keyboard.fill" : "circle.grid.3x3.fill")
+                            .font(.caption)
+                        Text(useManualWeight ? "Plates" : "Manual")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue.opacity(0.1))
+                    .foregroundColor(.blue)
+                    .cornerRadius(8)
+                }
             }
             
-            // Barbell visualization
-            BarbellVisualization(
-                plate45: plate45,
-                plate25: plate25,
-                plate10: plate10,
-                plate5: plate5,
-                plate2_5: plate2_5
-            )
+            // Total weight display
+            if useManualWeight {
+                // Manual input
+                VStack(spacing: 12) {
+                    TextField("Enter weight", text: $manualWeight)
+                        .keyboardType(.numberPad)
+                        .font(.system(size: 48, weight: .black, design: .rounded))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    
+                    Text("lbs")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 20)
+            } else {
+                // Plate calculator display
+                HStack {
+                    Spacer()
+                    Text("\(totalWeight) lbs")
+                        .font(.system(size: 32, weight: .black, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                }
+            }
             
-            Divider()
-            
-            // Plate selectors
-            VStack(spacing: 12) {
-                PlateRow(weight: 45, count: $plate45, color: .red)
-                PlateRow(weight: 25, count: $plate25, color: .green)
-                PlateRow(weight: 10, count: $plate10, color: .blue)
-                PlateRow(weight: 5, count: $plate5, color: .orange)
-                PlateRow(weight: 2.5, count: $plate2_5, color: .gray)
+            if !useManualWeight {
+                // Barbell visualization (only if not too many plates)
+                if totalPlatesPerSide <= maxPlatesForVisualization {
+                    BarbellVisualization(
+                        plate45: plate45,
+                        plate25: plate25,
+                        plate10: plate10,
+                        plate5: plate5,
+                        plate2_5: plate2_5
+                    )
+                } else {
+                    // Too many plates message
+                    VStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.title2)
+                            .foregroundColor(.orange)
+                        
+                        Text("Too many plates to visualize!")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        
+                        Text("\(totalPlatesPerSide) plates per side")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(height: 60)
+                    .frame(maxWidth: .infinity)
+                }
+                
+                Divider()
+                
+                // Plate selectors
+                VStack(spacing: 12) {
+                    PlateRow(weight: 45, count: $plate45, color: .red)
+                    PlateRow(weight: 25, count: $plate25, color: .green)
+                    PlateRow(weight: 10, count: $plate10, color: .blue)
+                    PlateRow(weight: 5, count: $plate5, color: .orange)
+                    PlateRow(weight: 2.5, count: $plate2_5, color: .gray)
+                }
             }
         }
         .padding(20)
@@ -357,20 +468,21 @@ struct PlateStack: View {
     
     var body: some View {
         HStack(spacing: 1) {
-            ForEach(0..<plate45, id: \.self) { _ in
-                PlateShape(color: .red, height: 55)
-            }
-            ForEach(0..<plate25, id: \.self) { _ in
-                PlateShape(color: .green, height: 50)
-            }
-            ForEach(0..<plate10, id: \.self) { _ in
-                PlateShape(color: .blue, height: 45)
+            // Lightest plates on the outside, heaviest on the inside
+            ForEach(0..<plate2_5, id: \.self) { _ in
+                PlateShape(color: .gray, height: 35)
             }
             ForEach(0..<plate5, id: \.self) { _ in
                 PlateShape(color: .orange, height: 40)
             }
-            ForEach(0..<plate2_5, id: \.self) { _ in
-                PlateShape(color: .gray, height: 35)
+            ForEach(0..<plate10, id: \.self) { _ in
+                PlateShape(color: .blue, height: 45)
+            }
+            ForEach(0..<plate25, id: \.self) { _ in
+                PlateShape(color: .green, height: 50)
+            }
+            ForEach(0..<plate45, id: \.self) { _ in
+                PlateShape(color: .red, height: 55)
             }
         }
     }
@@ -504,6 +616,21 @@ struct GymSelector: View {
     let closestGym: (name: String, id: String)?
     @Binding var showingGymPicker: Bool
     
+    // Helper to get gym name by ID
+    @StateObject private var gymRepository = GymRepository()
+    
+    private var selectedGymName: String {
+        if let gymId = selectedGym,
+           let gym = gymRepository.gyms.first(where: { $0.id == gymId }) {
+            return gym.name
+        }
+        return "Select a gym"
+    }
+    
+    private var isClosestGym: Bool {
+        selectedGym == closestGym?.id
+    }
+    
     var body: some View {
         Button {
             showingGymPicker = true
@@ -528,18 +655,18 @@ struct GymSelector: View {
                         .foregroundColor(.red)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        if let gym = closestGym {
-                            Text(gym.name)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.primary)
-                            
+                        Text(selectedGymName)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                        
+                        if isClosestGym {
                             Text("Closest to you")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                        } else {
-                            Text("Select a gym")
-                                .font(.subheadline)
+                        } else if selectedGym != nil {
+                            Text("Selected gym")
+                                .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -551,6 +678,9 @@ struct GymSelector: View {
             .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        }
+        .task {
+            await gymRepository.fetchGyms()
         }
     }
 }
