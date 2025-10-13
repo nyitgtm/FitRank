@@ -5,6 +5,7 @@ import FirebaseAuth
 @MainActor
 class WorkoutViewModel: ObservableObject {
     @Published var workouts: [Workout] = []
+    @Published var userWorkouts: [Workout] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -20,24 +21,27 @@ class WorkoutViewModel: ObservableObject {
                 teamId: "/teams/0",
                 videoUrl: "https://example.com/videos/workout1.mp4",
                 weight: 225,
-                liftType: .bench,
-                gymId: "gIlZvXqqfaj3qdCfAUns"
+                liftType: "bench",
+                gymId: "gIlZvXqqfaj3qdCfAUns",
+                status: "published"
             ),
             Workout(
                 userId: "user2",
                 teamId: "/teams/1",
                 videoUrl: "https://example.com/videos/workout2.mp4",
                 weight: 315,
-                liftType: .squat,
-                gymId: "gIlZvXqqfaj3qdCfAUns"
+                liftType: "squat",
+                gymId: "gIlZvXqqfaj3qdCfAUns",
+                status: "published"
             ),
             Workout(
                 userId: "user3",
                 teamId: "/teams/2",
                 videoUrl: "https://example.com/videos/workout3.mp4",
                 weight: 405,
-                liftType: .deadlift,
-                gymId: "gIlZvXqqfaj3qdCfAUns"
+                liftType: "deadlift",
+                gymId: "gIlZvXqqfaj3qdCfAUns",
+                status: "published"
             )
         ]
     }
@@ -52,19 +56,57 @@ class WorkoutViewModel: ObservableObject {
         }
     }
     
+    // MARK: - User-Specific Workouts
+    
+    func fetchUserWorkouts(userId: String, limit: Int? = nil) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let fetchedWorkouts = try await firebaseService.getWorkoutsByUser(userId: userId, limit: limit)
+            userWorkouts = fetchedWorkouts
+        } catch {
+            errorMessage = "Failed to fetch workouts: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    func fetchTop3UserWorkouts(userId: String) async {
+        await fetchUserWorkouts(userId: userId, limit: 3)
+    }
+    
+    func fetchAllUserWorkouts(userId: String) async {
+        await fetchUserWorkouts(userId: userId, limit: nil)
+    }
+    
+    // MARK: - Delete Workout
+    
+    func deleteWorkout(_ workout: Workout) async {
+        guard let workoutId = workout.id else { return }
+        
+        do {
+            try await firebaseService.deleteWorkout(workoutId: workoutId)
+            // Remove from local array
+            userWorkouts.removeAll { $0.id == workoutId }
+        } catch {
+            errorMessage = "Failed to delete workout: \(error.localizedDescription)"
+        }
+    }
+    
     // MARK: - Workout Creation
     
     func createWorkout(weight: Int, liftType: String, gymId: String, videoURL: URL) async {
         isLoading = true
         errorMessage = nil
         
-        // Convert string to LiftType enum
-        let liftTypeEnum: LiftType
+        // Convert display name to liftType string
+        let liftTypeString: String
         switch liftType {
-        case "Bench Press": liftTypeEnum = .bench
-        case "Squat": liftTypeEnum = .squat
-        case "Deadlift": liftTypeEnum = .deadlift
-        default: liftTypeEnum = .bench
+        case "Bench Press": liftTypeString = "bench"
+        case "Squat": liftTypeString = "squat"
+        case "Deadlift": liftTypeString = "deadlift"
+        default: liftTypeString = "bench"
         }
         
         do {
@@ -73,8 +115,9 @@ class WorkoutViewModel: ObservableObject {
                 teamId: userViewModel.currentUser?.team ?? "/teams/0",
                 videoUrl: videoURL.absoluteString,
                 weight: weight,
-                liftType: liftTypeEnum,
-                gymId: gymId
+                liftType: liftTypeString,
+                gymId: gymId,
+                status: "pending"
             )
             
             try await firebaseService.createWorkout(workout)

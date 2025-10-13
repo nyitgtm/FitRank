@@ -36,12 +36,18 @@ class UserViewModel: ObservableObject {
     func fetchUserProfile(userId: String) async {
         isLoading = true
         
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        await MainActor.run {
-            self.isLoading = false
+        do {
+            let fetchedUser = try await firebaseService.getUser(userId: userId)
+            currentUser = fetchedUser
+            isAuthenticated = true
+        } catch {
+            errorMessage = "Failed to fetch user profile: \(error.localizedDescription)"
+            
+            // If user doesn't exist, create default profile
+            await createDefaultUserProfile(userId: userId)
         }
+        
+        isLoading = false
     }
     
     private func createDefaultUserProfile(userId: String) async {
