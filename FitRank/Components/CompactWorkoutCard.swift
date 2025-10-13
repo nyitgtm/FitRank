@@ -2,9 +2,11 @@ import SwiftUI
 
 struct CompactWorkoutCard: View {
     let workout: Workout
+    let onTap: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 12) {
             // Lift type icon and weight
             HStack(spacing: 8) {
                 Image(systemName: workout.liftTypeEnum.icon)
@@ -69,6 +71,8 @@ struct CompactWorkoutCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color(.systemGray5), lineWidth: 1)
         )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
     
     private func statusColor(_ status: WorkoutStatus) -> Color {
@@ -110,6 +114,6 @@ struct StatPill: View {
         liftType: "bench",
         gymId: "gym1",
         status: "published"
-    ))
+    ), onTap: {})
     .padding()
 }

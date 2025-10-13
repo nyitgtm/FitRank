@@ -4,6 +4,7 @@ struct MyWorkoutsSection: View {
     @ObservedObject var workoutViewModel: WorkoutViewModel
     @ObservedObject var userViewModel: UserViewModel
     @State private var showingAllWorkouts = false
+    @State private var selectedWorkout: Workout?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -57,7 +58,9 @@ struct MyWorkoutsSection: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
                         ForEach(workoutViewModel.userWorkouts) { workout in
-                            CompactWorkoutCard(workout: workout)
+                            CompactWorkoutCard(workout: workout) {
+                                selectedWorkout = workout
+                            }
                         }
                     }
                     .padding(.horizontal, 20)
@@ -74,6 +77,9 @@ struct MyWorkoutsSection: View {
                     userUsername: userViewModel.currentUser?.username ?? "user"
                 )
             }
+        }
+        .sheet(item: $selectedWorkout) { workout in
+            WorkoutDetailView(workout: workout)
         }
         .onAppear {
             if let userId = userViewModel.currentUser?.id {
