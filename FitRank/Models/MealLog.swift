@@ -4,7 +4,6 @@
 //
 
 import Foundation
-import FirebaseFirestore
 
 enum MealType: String, CaseIterable, Codable {
     case breakfast = "Breakfast"

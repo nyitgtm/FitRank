@@ -69,12 +69,17 @@ struct NutritionMainView: View {
                             }
 
                         
-                        FeatureCard(
-                            icon: "chart.bar.fill",
-                            title: "Progress Tracker",
-                            subtitle: "Coming Soon",
-                            color: .gray
-                        )
+                        NavigationLink {
+                            ProgressTrackerView()
+                        } label: {
+                            FeatureCard(
+                                icon: "chart.bar.fill",
+                                title: "Progress Tracker",
+                                subtitle: "Track your weight loss",
+                                color: .purple
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                     .padding(.horizontal)
                     
