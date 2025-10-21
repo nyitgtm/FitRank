@@ -211,7 +211,8 @@ struct ServingSizeInputView: View {
     @FocusState private var isInputFocused: Bool
     
     var servingSizeDouble: Double {
-        Double(servingSize) ?? 100.0
+        let value = Double(servingSize) ?? 100.0
+        return max(0, value) // Prevent negative values
     }
     
     var scaledCalories: Double {
@@ -317,7 +318,7 @@ struct ServingSizeInputView: View {
                             .background(Color.blue)
                             .cornerRadius(12)
                     }
-                    .disabled(servingSize.isEmpty || Double(servingSize) == nil)
+                    .disabled(servingSize.isEmpty || Double(servingSize) == nil || servingSizeDouble <= 0)
                 }
                 .padding()
             }

@@ -35,7 +35,7 @@ struct MealLogSettingsView: View {
                     Button("Save Goal") {
                         saveCalorieGoal()
                     }
-                    .disabled(calorieGoalInput.isEmpty || Int(calorieGoalInput) == nil)
+                    .disabled(calorieGoalInput.isEmpty || Int(calorieGoalInput) == nil || (Int(calorieGoalInput) ?? 0) <= 0)
                 }
                 
                 Section(header: Text("Data Management")) {
