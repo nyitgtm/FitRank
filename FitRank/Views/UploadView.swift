@@ -7,6 +7,7 @@ struct UploadView: View {
     @StateObject private var workoutViewModel = WorkoutViewModel()
     @StateObject private var userViewModel = UserViewModel()
     @StateObject private var gymRepository = GymRepository()
+    @StateObject private var videoUploadService = VideoUploadService()
     
     @State private var videoURL: URL?
     @State private var selectedLiftType: LiftType = .bench
@@ -17,6 +18,9 @@ struct UploadView: View {
     @State private var showingSuccessAlert = false
     @State private var showingConfetti = false
     @State private var motivationalTip = ""
+    @State private var showError = false
+    @State private var errorMessage = ""
+    @State private var videoDuration: Double = 0
     
     // Plate counter state
     @State private var plate45Count = 0
@@ -53,7 +57,7 @@ struct UploadView: View {
     }
     
     private var canUpload: Bool {
-        videoURL != nil && totalWeight > 0 && selectedGym != nil && !workoutViewModel.isLoading
+        videoURL != nil && totalWeight > 0 && selectedGym != nil && !workoutViewModel.isLoading && !videoUploadService.isUploading
     }
     
     private var closestGym: (name: String, id: String)? {
@@ -102,7 +106,8 @@ struct UploadView: View {
                         // Upload Button
                         ModernUploadButton(
                             canUpload: canUpload,
-                            isLoading: workoutViewModel.isLoading,
+                            isLoading: workoutViewModel.isLoading || videoUploadService.isUploading,
+                            uploadProgress: videoUploadService.uploadProgress,
                             onUpload: uploadWorkout
                         )
                     }
@@ -126,7 +131,11 @@ struct UploadView: View {
             CameraView(videoURL: $videoURL)
         }
         .sheet(isPresented: $showingVideoPicker) {
-            VideoPickerView(videoURL: $videoURL)
+            VideoPicker(
+                videoURL: $videoURL,
+                showError: $showError,
+                errorMessage: $errorMessage
+            )
         }
         .sheet(isPresented: $showingGymPicker) {
             GymPickerSheet(
@@ -140,6 +149,11 @@ struct UploadView: View {
             }
         } message: {
             Text(motivationalTip)
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
         }
         .task {
             await gymRepository.fetchGyms()
@@ -156,24 +170,41 @@ struct UploadView: View {
               let userId = Auth.auth().currentUser?.uid else { return }
         
         Task {
-            await workoutViewModel.createWorkout(
-                weight: totalWeight,
-                liftType: selectedLiftType.displayName,
-                gymId: gymId,
-                videoURL: videoURL
-            )
-            
-            // Show confetti
-            showingConfetti = true
-            
-            // Show success with random tip after a brief delay
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            motivationalTip = motivationalTips.randomElement() ?? motivationalTips[0]
-            showingSuccessAlert = true
-            
-            // Reset form after confetti
-            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-            resetForm()
+            do {
+                // Generate unique workout ID
+                let workoutId = UUID().uuidString
+                
+                // Upload video to R2
+                let publicVideoURL = try await videoUploadService.uploadVideo(
+                    localURL: videoURL,
+                    workoutId: workoutId
+                )
+                
+                // Create workout in Firestore with R2 video URL
+                await workoutViewModel.createWorkoutWithId(
+                    workoutId: workoutId,
+                    weight: totalWeight,
+                    liftType: selectedLiftType.displayName,
+                    gymId: gymId,
+                    videoURL: publicVideoURL
+                )
+                
+                // Show confetti
+                showingConfetti = true
+                
+                // Show success with random tip after a brief delay
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                motivationalTip = motivationalTips.randomElement() ?? motivationalTips[0]
+                showingSuccessAlert = true
+                
+                // Reset form after confetti
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                resetForm()
+                
+            } catch {
+                errorMessage = error.localizedDescription
+                showError = true
+            }
         }
     }
     
@@ -689,38 +720,62 @@ struct GymSelector: View {
 struct ModernUploadButton: View {
     let canUpload: Bool
     let isLoading: Bool
+    let uploadProgress: Double
     let onUpload: () -> Void
     
     var body: some View {
         Button(action: onUpload) {
-            HStack(spacing: 12) {
-                if isLoading {
-                    ProgressView()
-                        .tint(.white)
-                } else {
-                    Image(systemName: canUpload ? "arrow.up.circle.fill" : "lock.fill")
-                        .font(.title3)
-                }
-                
-                Text(isLoading ? "Posting..." : canUpload ? "Post Workout" : "Complete All Fields")
-                    .font(.headline)
-                    .fontWeight(.bold)
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(
+            ZStack {
+                // Background
                 LinearGradient(
                     colors: canUpload ? [.blue, .purple] : [.gray, .gray],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
-            )
-            .cornerRadius(16)
+                .cornerRadius(16)
+                
+                // Progress bar
+                if isLoading && uploadProgress > 0 {
+                    GeometryReader { geometry in
+                        LinearGradient(
+                            colors: [.blue.opacity(0.6), .purple.opacity(0.6)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(width: geometry.size.width * uploadProgress)
+                        .cornerRadius(16)
+                    }
+                }
+                
+                // Content
+                HStack(spacing: 12) {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: canUpload ? "arrow.up.circle.fill" : "lock.fill")
+                            .font(.title3)
+                    }
+                    
+                    if isLoading && uploadProgress > 0 {
+                        Text("Uploading \(Int(uploadProgress * 100))%")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                    } else {
+                        Text(isLoading ? "Processing..." : canUpload ? "Post Workout" : "Complete All Fields")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                    }
+                }
+                .foregroundColor(.white)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
             .shadow(color: canUpload ? .blue.opacity(0.3) : .clear, radius: 15, y: 8)
         }
         .disabled(!canUpload || isLoading)
         .animation(.easeInOut(duration: 0.2), value: canUpload)
+        .animation(.linear(duration: 0.3), value: uploadProgress)
     }
 }
 

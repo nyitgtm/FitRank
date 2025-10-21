@@ -5,14 +5,8 @@
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
-
-#if canImport(UIKit)
 import UIKit
-#endif
-
-#if canImport(FirebaseStorage)
 import FirebaseStorage
-#endif
 
 // MARK: - Service
 
@@ -56,6 +50,11 @@ class FirebaseService: ObservableObject {
     func createWorkout(_ workout: Workout) async throws -> String {
         let documentRef = try await db.collection("workouts").addDocument(from: workout)
         return documentRef.documentID
+    }
+    
+    func createWorkoutWithId(_ workout: Workout) async throws {
+        guard let workoutId = workout.id else { throw FirebaseError.invalidWorkoutId }
+        try await db.collection("workouts").document(workoutId).setData(from: workout)
     }
 
     func getWorkouts(limit: Int = 50) async throws -> [Workout] {

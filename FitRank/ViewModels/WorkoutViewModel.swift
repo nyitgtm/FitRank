@@ -128,4 +128,41 @@ class WorkoutViewModel: ObservableObject {
         
         isLoading = false
     }
+    
+    /// Create workout with specific ID and video URL (used after R2 upload)
+    func createWorkoutWithId(workoutId: String, weight: Int, liftType: String, gymId: String, videoURL: String) async {
+        isLoading = true
+        errorMessage = nil
+        
+        // Convert display name to liftType string
+        let liftTypeString: String
+        switch liftType {
+        case "Bench Press": liftTypeString = "bench"
+        case "Squat": liftTypeString = "squat"
+        case "Deadlift": liftTypeString = "deadlift"
+        default: liftTypeString = "bench"
+        }
+        
+        do {
+            var workout = Workout(
+                userId: userViewModel.currentUser?.id ?? "",
+                teamId: userViewModel.currentUser?.team ?? "/teams/0",
+                videoUrl: videoURL,
+                weight: weight,
+                liftType: liftTypeString,
+                gymId: gymId,
+                status: "published" // Auto-publish for now, add moderation later
+            )
+            
+            // Set the workout ID to match the video filename
+            workout.id = workoutId
+            
+            try await firebaseService.createWorkoutWithId(workout)
+            
+        } catch {
+            errorMessage = "Failed to create workout: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
 }
