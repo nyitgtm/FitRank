@@ -10,87 +10,86 @@ struct RecipeSearchView: View {
     let apiKey = "e1cbcf2940b84bbaac6c7d0c40b48214" // Spoonacular API key
     
     var body: some View {
-        NavigationStack {
-            VStack {
-                // Search bar
-                HStack {
-                    TextField("Search recipes...", text: $query)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding(.horizontal)
-                    
-                    Button(action: fetchRecipes) {
-                        Image(systemName: "magnifyingglass")
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
-                    }
-                    .disabled(query.isEmpty)
-                    .padding(.trailing)
-                }
-                .padding(.top)
+        VStack {
+            // Search bar
+            HStack {
+                TextField("Search recipes...", text: $query)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding(.horizontal)
                 
-                // Loading / Error / Results
-                if isLoading {
-                    ProgressView("Fetching recipes...")
+                Button(action: fetchRecipes) {
+                    Image(systemName: "magnifyingglass")
                         .padding()
-                } else if let errorMessage = errorMessage {
-                    Text("⚠️ \(errorMessage)")
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                } else if recipes.isEmpty {
-                    Text("No recipes yet. Try searching above!")
-                        .foregroundColor(.secondary)
-                        .padding()
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(recipes) { recipe in
-                                NavigationLink(destination: RecipeDetailView(recipeId: recipe.id, apiKey: apiKey)) {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        if let imageUrl = recipe.image, let url = URL(string: imageUrl) {
-                                            AsyncImage(url: url) { image in
-                                                image.resizable()
-                                                    .aspectRatio(contentMode: .fill)
-                                                    .frame(height: 180)
-                                                    .cornerRadius(10)
-                                            } placeholder: {
-                                                ProgressView()
-                                            }
-                                        }
-                                        
-                                        Text(recipe.title)
-                                            .font(.headline)
-                                        
-                                        if let ready = recipe.readyInMinutes {
-                                            Text("Ready in \(ready) minutes")
-                                                .font(.subheadline)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        
-                                        if let servings = recipe.servings {
-                                            Text("Servings: \(servings)")
-                                                .font(.subheadline)
-                                                .foregroundColor(.secondary)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+                .disabled(query.isEmpty)
+                .padding(.trailing)
+            }
+            .padding(.top)
+            
+            // Loading / Error / Results
+            if isLoading {
+                ProgressView("Fetching recipes...")
+                    .padding()
+            } else if let errorMessage = errorMessage {
+                Text("⚠️ \(errorMessage)")
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            } else if recipes.isEmpty {
+                Text("No recipes yet. Try searching above!")
+                    .foregroundColor(.secondary)
+                    .padding()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        ForEach(recipes) { recipe in
+                            NavigationLink(destination: RecipeDetailView(recipeId: recipe.id, apiKey: apiKey)) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    if let imageUrl = recipe.image, let url = URL(string: imageUrl) {
+                                        AsyncImage(url: url) { image in
+                                            image.resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(height: 180)
+                                                .cornerRadius(10)
+                                        } placeholder: {
+                                            ProgressView()
                                         }
                                     }
-                                    .padding()
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(12)
-                                    .shadow(radius: 2)
-                                    .padding(.horizontal)
+                                    
+                                    Text(recipe.title)
+                                        .font(.headline)
+                                    
+                                    if let ready = recipe.readyInMinutes {
+                                        Text("Ready in \(ready) minutes")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    if let servings = recipe.servings {
+                                        Text("Servings: \(servings)")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
                                 }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(12)
+                                .shadow(radius: 2)
+                                .padding(.horizontal)
                             }
                         }
-                        .padding(.top)
                     }
+                    .padding(.top)
                 }
-                
-                Spacer()
             }
-            .navigationTitle("Recipe Search")
+            
+            Spacer()
         }
+        .navigationTitle("Recipe Search")
+        .navigationBarTitleDisplayMode(.large)
     }
     
     func fetchRecipes() {

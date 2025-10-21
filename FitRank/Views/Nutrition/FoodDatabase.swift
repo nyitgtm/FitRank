@@ -7,67 +7,66 @@ struct FoodDatabaseView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        NavigationView {
-            VStack {
-                // Search Bar
-                HStack {
-                    TextField("Search food...", text: $query, onCommit: fetchFoods)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding(.horizontal)
-                    
-                    Button(action: fetchFoods) {
-                        Image(systemName: "magnifyingglass")
-                            .padding(8)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
-                    }
-                    .padding(.trailing)
-                }
-                .padding(.top)
+        VStack {
+            // Search Bar
+            HStack {
+                TextField("Search food...", text: $query, onCommit: fetchFoods)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding(.horizontal)
                 
-                // What the statuis is
-                if isLoading {
-                    ProgressView("Searching...")
-                        .padding()
-                } else if let errorMessage = errorMessage {
-                    Text("⚠️ \(errorMessage)")
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                } else if foods.isEmpty && !query.isEmpty {
-                    Text("No foods found for \"\(query)\"")
-                        .foregroundColor(.secondary)
-                        .padding()
+                Button(action: fetchFoods) {
+                    Image(systemName: "magnifyingglass")
+                        .padding(8)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
                 }
-                
-                // List of food
-                List(foods, id: \.fdcId) { food in
-                    NavigationLink(destination: FoodDetailView(food: food)) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(food.description)
-                                .font(.headline)
-                            if let brand = food.brandOwner {
-                                Text(brand)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            HStack {
-                                Text("Calories: \(Int(food.calories)) kcal")
-                                Text("Protein: \(food.protein, specifier: "%.1f") g")
-                                Text("Carbs: \(food.carbs, specifier: "%.1f") g")
-                                Text("Fat: \(food.fat, specifier: "%.1f") g")
-                            }
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-                .listStyle(PlainListStyle())
+                .padding(.trailing)
             }
-            .navigationTitle("Food Database")
+            .padding(.top)
+            
+            // What the statuis is
+            if isLoading {
+                ProgressView("Searching...")
+                    .padding()
+            } else if let errorMessage = errorMessage {
+                Text("⚠️ \(errorMessage)")
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            } else if foods.isEmpty && !query.isEmpty {
+                Text("No foods found for \"\(query)\"")
+                    .foregroundColor(.secondary)
+                    .padding()
+            }
+            
+            // List of food
+            List(foods, id: \.fdcId) { food in
+                NavigationLink(destination: FoodDetailView(food: food)) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(food.description)
+                            .font(.headline)
+                        if let brand = food.brandOwner {
+                            Text(brand)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        HStack {
+                            Text("Calories: \(Int(food.calories)) kcal")
+                            Text("Protein: \(food.protein, specifier: "%.1f") g")
+                            Text("Carbs: \(food.carbs, specifier: "%.1f") g")
+                            Text("Fat: \(food.fat, specifier: "%.1f") g")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .listStyle(PlainListStyle())
         }
+        .navigationTitle("Food Database")
+        .navigationBarTitleDisplayMode(.large)
     }
 
     // MARK: - Fetch Foods
