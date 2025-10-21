@@ -6,8 +6,6 @@
 import SwiftUI
 
 struct NutritionMainView: View {
-    @Environment(\.dismiss) private var dismiss
-    
     var body: some View {
         NavigationView {
             ScrollView {
@@ -106,13 +104,6 @@ struct NutritionMainView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
     }
