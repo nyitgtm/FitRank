@@ -39,7 +39,7 @@ struct CalorieResultsView: View {
                 }
             }
             .navigationTitle("Your Results")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {

@@ -45,27 +45,42 @@ struct NutritionMainView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                         
-                        // Coming Soon Features
-                        FeatureCard(
-                            icon: "list.clipboard",
-                            title: "Meal Logger",
-                            subtitle: "Coming Soon",
-                            color: .gray
-                        )
+                        // Meal Logger Card
+                        NavigationLink {
+                            MealLoggerView()
+                        } label: {
+                            FeatureCard(
+                                icon: "list.clipboard",
+                                title: "Meal Logger",
+                                subtitle: "Track your daily meals",
+                                color: .orange
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        NavigationLink {
+                                FoodDataMainView()
+                            } label: {
+                                FeatureCard(
+                                    icon: "magnifyingglass",
+                                    title: "Food Database",
+                                    subtitle: "Search foods & nutrients",
+                                    color: .blue
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+
                         
-                        FeatureCard(
-                            icon: "magnifyingglass",
-                            title: "Food Database",
-                            subtitle: "Coming Soon",
-                            color: .gray
-                        )
-                        
-                        FeatureCard(
-                            icon: "chart.bar.fill",
-                            title: "Progress Tracker",
-                            subtitle: "Coming Soon",
-                            color: .gray
-                        )
+                        NavigationLink {
+                            ProgressTrackerView()
+                        } label: {
+                            FeatureCard(
+                                icon: "chart.bar.fill",
+                                title: "Progress Tracker",
+                                subtitle: "Track your weight loss",
+                                color: .purple
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                     .padding(.horizontal)
                     

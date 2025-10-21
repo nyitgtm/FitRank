@@ -11,44 +11,35 @@ struct CalorieCalculatorView: View {
     @State private var showingResults = false
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        headerSection
-                        
-                        // Unit System Toggle
-                        unitSystemSection
-                        
-                        // Input Form
-                        inputFormSection
-                        
-                        // Calculate Button
-                        calculateButton
-                        
-                        Spacer(minLength: 40)
-                    }
-                    .padding(.horizontal, 20)
+        ZStack {
+            Color(.systemGroupedBackground)
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    headerSection
+                    
+                    // Unit System Toggle
+                    unitSystemSection
+                    
+                    // Input Form
+                    inputFormSection
+                    
+                    // Calculate Button
+                    calculateButton
+                    
+                    Spacer(minLength: 40)
                 }
+                .padding(.horizontal, 20)
             }
-            .navigationTitle("Calorie Calculator")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Back") {
-                        dismiss()
-                    }
-                }
-            }
-            .sheet(isPresented: $showingResults) {
-                if let calculation = viewModel.calculation {
-                    CalorieResultsView(calculation: calculation) {
-                        dismiss()
-                    }
+        }
+        .navigationTitle("Calorie Calculator")
+        .navigationBarTitleDisplayMode(.large)
+        .sheet(isPresented: $showingResults) {
+            if let calculation = viewModel.calculation {
+                CalorieResultsView(calculation: calculation) {
+                    dismiss()
                 }
             }
         }
