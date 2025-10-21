@@ -444,9 +444,9 @@ struct WorkoutCardWithDelete: View {
                 
                 // Stats
                 HStack(spacing: 20) {
-                    StatItem(icon: "eye.fill", value: "\(workout.views)", color: .secondary)
-                    StatItem(icon: "hand.thumbsup.fill", value: "\(workout.upvotes)", color: .green)
-                    StatItem(icon: "hand.thumbsdown.fill", value: "\(workout.downvotes)", color: .red)
+                    WorkoutStatItem(icon: "eye.fill", value: "\(workout.views)", color: .secondary)
+                    WorkoutStatItem(icon: "hand.thumbsup.fill", value: "\(workout.upvotes)", color: .green)
+                    WorkoutStatItem(icon: "hand.thumbsdown.fill", value: "\(workout.downvotes)", color: .red)
                 }
                 
                 // Date and status
@@ -499,7 +499,7 @@ struct WorkoutCardWithDelete: View {
     }
 }
 
-struct StatItem: View {
+struct WorkoutStatItem: View {
     let icon: String
     let value: String
     let color: Color
