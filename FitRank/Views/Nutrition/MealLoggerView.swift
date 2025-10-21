@@ -10,6 +10,8 @@ struct MealLoggerView: View {
     @State private var showingAddFood = false
     @State private var selectedMealType: MealType = .breakfast
     @State private var showingSettings = false
+    @State private var editingEntry: FoodEntry?
+    @State private var editingMealType: MealType?
     
     var body: some View {
         NavigationView {
@@ -42,6 +44,10 @@ struct MealLoggerView: View {
                             },
                             onDelete: { entry in
                                 viewModel.removeFoodEntry(entry, from: mealType)
+                            },
+                            onEdit: { entry in
+                                editingEntry = entry
+                                editingMealType = mealType
                             }
                         )
                         .padding(.horizontal)
@@ -68,6 +74,13 @@ struct MealLoggerView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 MealLogSettingsView(viewModel: viewModel)
+            }
+            .sheet(item: $editingEntry) { entry in
+                if let mealType = editingMealType {
+                    EditFoodEntryView(entry: entry, mealType: mealType) { updatedEntry in
+                        viewModel.updateFoodEntry(entry, with: updatedEntry, in: mealType)
+                    }
+                }
             }
             .onAppear {
                 // Load calorie goal from UserDefaults
@@ -274,6 +287,7 @@ struct MealSection: View {
     let entries: [FoodEntry]
     let onAddFood: () -> Void
     let onDelete: (FoodEntry) -> Void
+    let onEdit: (FoodEntry) -> Void
     
     var totalCalories: Int {
         Int(entries.reduce(0) { $0 + $1.scaledCalories })
@@ -313,6 +327,8 @@ struct MealSection: View {
                 ForEach(entries) { entry in
                     FoodEntryRow(entry: entry, onDelete: {
                         onDelete(entry)
+                    }, onEdit: {
+                        onEdit(entry)
                     })
                 }
             }
@@ -327,36 +343,44 @@ struct MealSection: View {
 struct FoodEntryRow: View {
     let entry: FoodEntry
     let onDelete: () -> Void
+    let onEdit: () -> Void
     
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(entry.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                
-                if let brand = entry.brandName {
-                    Text(brand)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+            Button(action: onEdit) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(entry.name)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                        
+                        if let brand = entry.brandName {
+                            Text(brand)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text("\(Int(entry.servingSize)) \(entry.servingUnit)")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("\(Int(entry.scaledCalories)) cal")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                        
+                        Text("P: \(Int(entry.scaledProtein))g • C: \(Int(entry.scaledCarbs))g • F: \(Int(entry.scaledFat))g")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
-                
-                Text("\(Int(entry.servingSize)) \(entry.servingUnit)")
-                    .font(.caption)
-                    .foregroundColor(.blue)
             }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 4) {
-                Text("\(Int(entry.scaledCalories)) cal")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                
-                Text("P: \(Int(entry.scaledProtein))g • C: \(Int(entry.scaledCarbs))g • F: \(Int(entry.scaledFat))g")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
+            .buttonStyle(PlainButtonStyle())
             
             Button(action: onDelete) {
                 Image(systemName: "trash")
@@ -366,6 +390,169 @@ struct FoodEntryRow: View {
             .padding(.leading, 8)
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Edit Food Entry View
+struct EditFoodEntryView: View {
+    @Environment(\.dismiss) private var dismiss
+    let entry: FoodEntry
+    let mealType: MealType
+    let onUpdate: (FoodEntry) -> Void
+    
+    @State private var servingSize: String
+    @State private var servingUnit: String
+    @FocusState private var isInputFocused: Bool
+    
+    init(entry: FoodEntry, mealType: MealType, onUpdate: @escaping (FoodEntry) -> Void) {
+        self.entry = entry
+        self.mealType = mealType
+        self.onUpdate = onUpdate
+        _servingSize = State(initialValue: String(format: "%.0f", entry.servingSize))
+        _servingUnit = State(initialValue: entry.servingUnit)
+    }
+    
+    var servingSizeDouble: Double {
+        let value = Double(servingSize) ?? entry.servingSize
+        return max(0, value) // Prevent negative values
+    }
+    
+    var scaledCalories: Double {
+        entry.calories * (servingSizeDouble / 100.0)
+    }
+    
+    var scaledProtein: Double {
+        entry.protein * (servingSizeDouble / 100.0)
+    }
+    
+    var scaledCarbs: Double {
+        entry.carbs * (servingSizeDouble / 100.0)
+    }
+    
+    var scaledFat: Double {
+        entry.fat * (servingSizeDouble / 100.0)
+    }
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Food Info
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(entry.name)
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                        
+                        if let brand = entry.brandName {
+                            Text(brand)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    
+                    // Serving Size Input
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Serving Size")
+                            .font(.headline)
+                        
+                        HStack {
+                            TextField("Amount", text: $servingSize)
+                                .keyboardType(.decimalPad)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 100)
+                                .focused($isInputFocused)
+                            
+                            Picker("Unit", selection: $servingUnit) {
+                                Text("g").tag("g")
+                                Text("oz").tag("oz")
+                                Text("serving").tag("serving")
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        
+                        // Quick Amounts
+                        HStack(spacing: 12) {
+                            ForEach([50, 100, 150, 200], id: \.self) { amount in
+                                Button("\(amount)g") {
+                                    servingSize = "\(amount)"
+                                    servingUnit = "g"
+                                }
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(8)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    
+                    // Nutrition Preview
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Nutrition for \(servingSize) \(servingUnit)")
+                            .font(.headline)
+                        
+                        VStack(spacing: 12) {
+                            NutritionRow(label: "Calories", value: "\(Int(scaledCalories))", unit: "kcal", color: .blue)
+                            NutritionRow(label: "Protein", value: String(format: "%.1f", scaledProtein), unit: "g", color: .red)
+                            NutritionRow(label: "Carbohydrates", value: String(format: "%.1f", scaledCarbs), unit: "g", color: .orange)
+                            NutritionRow(label: "Fat", value: String(format: "%.1f", scaledFat), unit: "g", color: .purple)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    
+                    // Update Button
+                    Button(action: updateFood) {
+                        Text("Update Meal")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                    }
+                    .disabled(servingSize.isEmpty || Double(servingSize) == nil || servingSizeDouble <= 0)
+                }
+                .padding()
+            }
+            .navigationTitle("Edit Serving")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    func updateFood() {
+        // Create a new entry with updated values, keeping the same ID
+        let newEntry = FoodEntry(
+            id: entry.id, // Keep the same ID so it replaces the correct entry
+            foodId: entry.foodId,
+            name: entry.name,
+            brandName: entry.brandName,
+            servingSize: servingSizeDouble,
+            servingUnit: servingUnit,
+            calories: entry.calories,
+            protein: entry.protein,
+            carbs: entry.carbs,
+            fat: entry.fat,
+            timestamp: entry.timestamp
+        )
+        onUpdate(newEntry)
+        dismiss()
     }
 }
 

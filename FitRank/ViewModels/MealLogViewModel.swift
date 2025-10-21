@@ -58,6 +58,12 @@ class MealLogViewModel: ObservableObject {
         saveMealLog()
     }
     
+    func updateFoodEntry(_ oldEntry: FoodEntry, with newEntry: FoodEntry, in mealType: MealType) {
+        currentDayLog?.removeEntry(oldEntry, from: mealType)
+        currentDayLog?.addEntry(newEntry, to: mealType)
+        saveMealLog()
+    }
+    
     func saveMealLog() {
         guard let log = currentDayLog else { return }
         

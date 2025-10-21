@@ -22,17 +22,31 @@ enum MealType: String, CaseIterable, Codable {
 }
 
 struct FoodEntry: Identifiable, Codable, Hashable {
-    var id: String = UUID().uuidString
+    let id: String
     let foodId: Int // FDC ID from API
     let name: String
     let brandName: String?
-    var servingSize: Double // in grams or specified unit
+    let servingSize: Double // in grams or specified unit
     let servingUnit: String
     let calories: Double
     let protein: Double
     let carbs: Double
     let fat: Double
     let timestamp: Date
+    
+    init(id: String = UUID().uuidString, foodId: Int, name: String, brandName: String?, servingSize: Double, servingUnit: String, calories: Double, protein: Double, carbs: Double, fat: Double, timestamp: Date) {
+        self.id = id
+        self.foodId = foodId
+        self.name = name
+        self.brandName = brandName
+        self.servingSize = servingSize
+        self.servingUnit = servingUnit
+        self.calories = calories
+        self.protein = protein
+        self.carbs = carbs
+        self.fat = fat
+        self.timestamp = timestamp
+    }
     
     var scaledCalories: Double {
         calories * (servingSize / 100.0)

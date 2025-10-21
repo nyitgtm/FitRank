@@ -487,7 +487,10 @@ struct SettingsSheet: View {
     private func saveSettings() {
         guard let maintenance = Int(maintenanceCalories),
               let lossPerWeek = Double(targetWeightLossPerWeek),
-              let weight = Double(currentWeight) else {
+              let weight = Double(currentWeight),
+              maintenance > 0,
+              lossPerWeek > 0,
+              weight > 0 else {
             return
         }
         
