@@ -15,6 +15,7 @@
 		C3EBD7F82DF501F3005FE241 /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = C3EBD7F72DF501F3005FE241 /* FirebaseAnalyticsIdentitySupport */; };
 		C3EBD7FA2DF501F3005FE241 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = C3EBD7F92DF501F3005FE241 /* FirebaseAnalyticsOnDeviceConversion */; };
 		C3EBD7FD2DF50873005FE241 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = C3EBD7FC2DF50873005FE241 /* FirebaseAuth */; };
+		E6E99F412E9606E1003ED881 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = E6E99F402E9606E1003ED881 /* FirebaseStorage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +71,7 @@
 				C3EBD7F42DF501F3005FE241 /* FirebaseAnalytics in Frameworks */,
 				C3EBD7FA2DF501F3005FE241 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
 				C3EBD7F62DF501F3005FE241 /* FirebaseAnalyticsCore in Frameworks */,
+				E6E99F412E9606E1003ED881 /* FirebaseStorage in Frameworks */,
 				C3EBD7F22DF501F3005FE241 /* FirebaseAI in Frameworks */,
 				C3071C1E2E4994F10013D4AB /* FirebaseFirestore in Frameworks */,
 			);
@@ -149,6 +151,7 @@
 				C3EBD7F92DF501F3005FE241 /* FirebaseAnalyticsOnDeviceConversion */,
 				C3EBD7FC2DF50873005FE241 /* FirebaseAuth */,
 				C3071C1D2E4994F10013D4AB /* FirebaseFirestore */,
+				E6E99F402E9606E1003ED881 /* FirebaseStorage */,
 			);
 			productName = FitRank;
 			productReference = C38A48872DF3F7BD0064D3C3 /* FitRank.app */;
@@ -208,7 +211,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1640;
-				LastUpgradeCheck = 1640;
+				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					C38A48862DF3F7BD0064D3C3 = {
 						CreatedOnToolsVersion = 16.4;
@@ -344,6 +347,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 9QSV39W9JG;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -367,6 +371,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -406,6 +411,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 9QSV39W9JG;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -422,6 +428,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -434,9 +441,12 @@
 				CODE_SIGN_ENTITLEMENTS = FitRank/FitRank.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9QSV39W9JG;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSLocationUsageDescription = "This app needs your location to show your position on the map";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs your location to show your position on the mapThis app needs your location to show your position on the map";
@@ -476,9 +486,12 @@
 				CODE_SIGN_ENTITLEMENTS = FitRank/FitRank.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9QSV39W9JG;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSLocationUsageDescription = "This app needs your location to show your position on the map";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs your location to show your position on the mapThis app needs your location to show your position on the map";
@@ -516,6 +529,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9QSV39W9JG;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
@@ -539,6 +553,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9QSV39W9JG;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
@@ -561,6 +576,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9QSV39W9JG;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
@@ -583,6 +599,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9QSV39W9JG;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
@@ -687,6 +704,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C3C417712DF4FF8A00ABFADE /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
+		};
+		E6E99F402E9606E1003ED881 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C3C417712DF4FF8A00ABFADE /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

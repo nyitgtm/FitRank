@@ -20,13 +20,13 @@ final class CalorieCalculatorViewModel: ObservableObject {
     
     // Form validation
     var isFormValid: Bool {
-        userProfile.age >= 15 && userProfile.age <= 100 &&
+        userProfile.age > 0 && userProfile.age >= 15 && userProfile.age <= 100 &&
         (userProfile.unitSystem == .metric ?
-         (userProfile.weight >= 30 && userProfile.weight <= 300) :
-         (weightPounds >= 66 && weightPounds <= 660)) && // 30-300kg in lbs
+         (userProfile.weight > 0 && userProfile.weight >= 30 && userProfile.weight <= 300) :
+         (weightPounds > 0 && weightPounds >= 66 && weightPounds <= 660)) && // 30-300kg in lbs
         (userProfile.unitSystem == .metric ?
-         (userProfile.height >= 100 && userProfile.height <= 250) :
-         (heightFeet >= 3 && heightFeet <= 8)) // 100-250cm in ft
+         (userProfile.height > 0 && userProfile.height >= 100 && userProfile.height <= 250) :
+         (heightFeet > 0 && heightFeet >= 3 && heightFeet <= 8)) // 100-250cm in ft
     }
     
     func updateUnits() {
