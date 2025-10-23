@@ -14,64 +14,62 @@ struct GymDetailView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                if viewModel.isInitialLoading {
-                    // Loading state
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                        Text("Loading gym details...")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    // Content
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            // Header Section
-                            headerSection
-                            
+        ZStack {
+            if viewModel.isInitialLoading {
+                // Loading state
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text("Loading gym details...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                // Content
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Header Section
+                        headerSection
+                        
+                        Divider()
+                        
+                        // Location Section
+                        locationSection
+                        
+                        Divider()
+                        
+                        // Owner Team Section
+                        if viewModel.ownerTeam != nil {
+                            ownerTeamSection
                             Divider()
-                            
-                            // Location Section
-                            locationSection
-                            
-                            Divider()
-                            
-                            // Owner Team Section
-                            if viewModel.ownerTeam != nil {
-                                ownerTeamSection
-                                Divider()
-                            }
-                            
-                            // Best Lifts Section
-                            bestLiftsSection
-                            
-                            Spacer()
                         }
-                        .padding()
+                        
+                        // Best Lifts Section
+                        bestLiftsSection
+                        
+                        Spacer()
                     }
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    .padding()
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: viewModel.isInitialLoading)
+        .navigationTitle("Gym Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
                 }
             }
-            .animation(.easeInOut(duration: 0.3), value: viewModel.isInitialLoading)
-            .navigationTitle("Gym Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-            .task {
-                await viewModel.loadData()
-            }
-            .sheet(isPresented: $showWorkoutDetail) {
-                if let workout = selectedWorkout {
-                    WorkoutDetailView(workout: workout)
-                }
+        }
+        .task {
+            await viewModel.loadData()
+        }
+        .sheet(isPresented: $showWorkoutDetail) {
+            if let workout = selectedWorkout {
+                WorkoutDetailView(workout: workout)
             }
         }
     }

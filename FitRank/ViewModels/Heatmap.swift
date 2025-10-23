@@ -216,7 +216,9 @@ struct Heatmap: View {
         }
         .sheet(isPresented: $showGymDetail) {
             if let gym = selectedGym {
-                GymDetailView(gym: gym)
+                NavigationView {
+                    GymDetailView(gym: gym)
+                }
             }
         }
     }
