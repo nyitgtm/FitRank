@@ -79,6 +79,8 @@ struct Heatmap: View {
 
     @StateObject private var locationManager = LocationManager()
     @State private var currentZoomLevel: Double = 0.05 // Track zoom level
+    @State private var selectedGym: Gym? // Track selected gym for detail view
+    @State private var showGymDetail = false // Control sheet presentation
     
     // Computed property to check if map is zoomed in enough to show team labels
     private var isZoomedIn: Bool {
@@ -191,6 +193,11 @@ struct Heatmap: View {
                 Text(errorMessage)
             }
         }
+        .sheet(isPresented: $showGymDetail) {
+            if let gym = selectedGym {
+                GymDetailView(gym: gym)
+            }
+        }
     }
 
     var mapView: some View {
@@ -201,28 +208,34 @@ struct Heatmap: View {
                     latitude: gym.location.lat,
                     longitude: gym.location.lon
                 )) {
-                    VStack(spacing: 4) {
-                        Circle()
-                            .fill(colorForTeam(teamId: gym.ownerTeamId))
-                            .frame(width: 20, height: 20)
-                            .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
-                        
-                        // Show team ownership when zoomed in
-                        if isZoomedIn,
-                           let teamId = gym.ownerTeamId,
-                           teamId != "teams/0", // Exclude default/unowned
-                           let team = gymRepository.getTeam(for: teamId) {
-                            Text("Owned by \(team.name)")
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.ultraThinMaterial)
-                                .cornerRadius(6)
-                                .opacity(0.9)
+                    Button(action: {
+                        selectedGym = gym
+                        showGymDetail = true
+                    }) {
+                        VStack(spacing: 4) {
+                            Circle()
+                                .fill(colorForTeam(teamId: gym.ownerTeamId))
+                                .frame(width: 20, height: 20)
+                                .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
+                            
+                            // Show team ownership when zoomed in
+                            if isZoomedIn,
+                               let teamId = gym.ownerTeamId,
+                               teamId != "teams/0", // Exclude default/unowned
+                               let team = gymRepository.getTeam(for: teamId) {
+                                Text("Owned by \(team.name)")
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(.ultraThinMaterial)
+                                    .cornerRadius(6)
+                                    .opacity(0.9)
+                            }
                         }
                     }
+                    .buttonStyle(.plain)
                 }
             }
 
