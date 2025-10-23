@@ -15,31 +15,47 @@ struct GymDetailView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Header Section
-                    headerSection
-                    
-                    Divider()
-                    
-                    // Location Section
-                    locationSection
-                    
-                    Divider()
-                    
-                    // Owner Team Section
-                    if viewModel.ownerTeam != nil {
-                        ownerTeamSection
-                        Divider()
+            ZStack {
+                if viewModel.isInitialLoading {
+                    // Loading state
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Loading gym details...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
                     }
-                    
-                    // Best Lifts Section
-                    bestLiftsSection
-                    
-                    Spacer()
+                } else {
+                    // Content
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            // Header Section
+                            headerSection
+                            
+                            Divider()
+                            
+                            // Location Section
+                            locationSection
+                            
+                            Divider()
+                            
+                            // Owner Team Section
+                            if viewModel.ownerTeam != nil {
+                                ownerTeamSection
+                                Divider()
+                            }
+                            
+                            // Best Lifts Section
+                            bestLiftsSection
+                            
+                            Spacer()
+                        }
+                        .padding()
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
-                .padding()
             }
+            .animation(.easeInOut(duration: 0.3), value: viewModel.isInitialLoading)
             .navigationTitle("Gym Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -105,10 +121,7 @@ struct GymDetailView: View {
                 .font(.headline)
                 .foregroundColor(.blue)
             
-            if viewModel.isLoadingTeam {
-                ProgressView()
-                    .padding()
-            } else if let team = viewModel.ownerTeam {
+            if let team = viewModel.ownerTeam {
                 HStack {
                     if let icon = team.icon {
                         Image(systemName: icon)
@@ -140,8 +153,17 @@ struct GymDetailView: View {
                 .foregroundColor(.blue)
             
             if viewModel.isLoadingWorkouts {
-                ProgressView()
+                HStack {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        ProgressView()
+                        Text("Finding best lifts...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                     .padding()
+                    Spacer()
+                }
             } else {
                 // Best Bench
                 liftCard(
@@ -193,6 +215,14 @@ struct GymDetailView: View {
                             Text("by \(user.name)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                        } else {
+                            HStack(spacing: 4) {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                Text("Loading user...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                         
                         if let team = viewModel.teams[workout.teamId] {
@@ -248,7 +278,7 @@ class GymDetailViewModel: ObservableObject {
     @Published var users: [String: User] = [:]
     @Published var teams: [String: Team] = [:]
     
-    @Published var isLoadingTeam = false
+    @Published var isInitialLoading = true
     @Published var isLoadingWorkouts = false
     
     private let gym: Gym
@@ -260,21 +290,19 @@ class GymDetailViewModel: ObservableObject {
     }
     
     func loadData() async {
-        await withTaskGroup(of: Void.self) { group in
-            // Load owner team
-            if let ownerTeamId = gym.ownerTeamId, ownerTeamId != "teams/0" {
-                group.addTask { await self.loadOwnerTeam(teamId: ownerTeamId) }
-            }
-            
-            // Load best lifts by querying workouts
-            group.addTask { await self.loadBestLifts() }
+        // Load basic info first (fast)
+        if let ownerTeamId = gym.ownerTeamId, ownerTeamId != "teams/0" {
+            await loadOwnerTeam(teamId: ownerTeamId)
         }
+        
+        // Show content immediately
+        isInitialLoading = false
+        
+        // Then load workouts in background
+        await loadBestLifts()
     }
     
     private func loadOwnerTeam(teamId: String) async {
-        isLoadingTeam = true
-        defer { isLoadingTeam = false }
-        
         do {
             // Extract team ID from path if needed
             let cleanTeamId = teamId.components(separatedBy: "/").last ?? teamId
@@ -289,16 +317,19 @@ class GymDetailViewModel: ObservableObject {
     }
     
     private func loadBestLifts() async {
-        guard let gymId = gym.id else { return }
+        guard let gymId = gym.id else { 
+            isLoadingWorkouts = false
+            return 
+        }
         
         isLoadingWorkouts = true
-        defer { isLoadingWorkouts = false }
         
         do {
-            // Query all workouts for this gym
+            // Query only published workouts for this gym - optimized query
             let snapshot = try await db.collection("workouts")
                 .whereField("gymId", isEqualTo: gymId)
                 .whereField("status", isEqualTo: "published")
+                .limit(to: 100) // Limit results for performance
                 .getDocuments()
             
             let workouts = try snapshot.documents.compactMap { try $0.data(as: Workout.self) }
@@ -312,7 +343,9 @@ class GymDetailViewModel: ObservableObject {
             bestSquatWorkout = squatWorkouts.max(by: { $0.weight < $1.weight })
             bestDeadliftWorkout = deadliftWorkouts.max(by: { $0.weight < $1.weight })
             
-            // Load related data for all workouts
+            isLoadingWorkouts = false
+            
+            // Load related data in background (non-blocking)
             let allBestWorkouts = [bestBenchWorkout, bestSquatWorkout, bestDeadliftWorkout].compactMap { $0 }
             
             await withTaskGroup(of: Void.self) { group in
@@ -323,6 +356,7 @@ class GymDetailViewModel: ObservableObject {
             
         } catch {
             print("Error loading best lifts: \(error)")
+            isLoadingWorkouts = false
         }
     }
     
