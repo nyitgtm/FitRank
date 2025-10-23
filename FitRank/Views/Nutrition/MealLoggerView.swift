@@ -10,6 +10,7 @@ struct MealLoggerView: View {
     @State private var showingAddFood = false
     @State private var selectedMealType: MealType = .breakfast
     @State private var showingSettings = false
+    @State private var showingEditFood = false
     @State private var editingEntry: FoodEntry?
     @State private var editingMealType: MealType?
     
@@ -48,6 +49,7 @@ struct MealLoggerView: View {
                             onEdit: { entry in
                                 editingEntry = entry
                                 editingMealType = mealType
+                                showingEditFood = true
                             }
                         )
                         .padding(.horizontal)
@@ -75,10 +77,11 @@ struct MealLoggerView: View {
             .sheet(isPresented: $showingSettings) {
                 MealLogSettingsView(viewModel: viewModel)
             }
-            .sheet(item: $editingEntry) { entry in
-                if let mealType = editingMealType {
+            .sheet(isPresented: $showingEditFood) {
+                if let entry = editingEntry, let mealType = editingMealType {
                     EditFoodEntryView(entry: entry, mealType: mealType) { updatedEntry in
                         viewModel.updateFoodEntry(entry, with: updatedEntry, in: mealType)
+                        showingEditFood = false
                     }
                 }
             }
