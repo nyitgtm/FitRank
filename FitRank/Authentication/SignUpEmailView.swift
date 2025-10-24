@@ -93,8 +93,12 @@ final class SignUpEmailViewModel: ObservableObject {
         do {
             _ = try await authManager.createUser(email: email, password: password)
             currentStep = .userInfo
-        } catch {
-            errorMessage = "Failed to create account. Please try again."
+        } catch let error as NSError {
+            if error.domain == "FIRAuthErrorDomain" && error.code == 17007 {
+                errorMessage = "This email is already in use. Please sign in."
+            } else {
+                errorMessage = "Failed to create account. Please try again."
+            }
             print("Auth error: \(error)")
         }
         
