@@ -14,6 +14,7 @@ import FirebaseAuth
 final class SignUpEmailViewModel: ObservableObject {
     @Published var email = ""
     @Published var password = ""
+    @Published var confirmPassword = ""
     @Published var name = ""
     @Published var username = ""
     @Published var selectedTeam: Team?
@@ -41,7 +42,23 @@ final class SignUpEmailViewModel: ObservableObject {
     }
     
     private func validatePassword(_ password: String) -> Bool {
+        return password.count >= 8 && hasNumber(password) && hasUppercase(password) && hasSpecialCharacter(password)
+    }
+    
+    func hasMinLength(_ password: String) -> Bool {
         return password.count >= 8
+    }
+    
+    func hasNumber(_ password: String) -> Bool {
+        return password.range(of: "[0-9]", options: .regularExpression) != nil
+    }
+    
+    func hasUppercase(_ password: String) -> Bool {
+        return password.range(of: "[A-Z]", options: .regularExpression) != nil
+    }
+    
+    func hasSpecialCharacter(_ password: String) -> Bool {
+        return password.range(of: "[!@#$%^&*(),.?\":{}|<>]", options: .regularExpression) != nil
     }
     
     private func validateUsername(_ username: String) -> Bool {
@@ -61,7 +78,12 @@ final class SignUpEmailViewModel: ObservableObject {
         }
         
         guard validatePassword(password) else {
-            errorMessage = "Password must be at least 8 characters long."
+            errorMessage = "Password must meet all requirements."
+            return
+        }
+        
+        guard password == confirmPassword else {
+            errorMessage = "Passwords do not match."
             return
         }
         
@@ -246,6 +268,51 @@ struct CredentialsStepView: View {
                 SecureField("Create a password", text: $viewModel.password)
                     .textFieldStyle(ModernTextFieldStyle())
                     .textContentType(.newPassword)
+                
+                // Password requirements checklist
+                if !viewModel.password.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        PasswordRequirementRow(
+                            text: "At least 8 characters",
+                            isMet: viewModel.hasMinLength(viewModel.password)
+                        )
+                        PasswordRequirementRow(
+                            text: "Contains a number",
+                            isMet: viewModel.hasNumber(viewModel.password)
+                        )
+                        PasswordRequirementRow(
+                            text: "Contains an uppercase letter",
+                            isMet: viewModel.hasUppercase(viewModel.password)
+                        )
+                        PasswordRequirementRow(
+                            text: "Contains a special character",
+                            isMet: viewModel.hasSpecialCharacter(viewModel.password)
+                        )
+                    }
+                    .padding(.top, 4)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Confirm Password")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                SecureField("Re-enter your password", text: $viewModel.confirmPassword)
+                    .textFieldStyle(ModernTextFieldStyle())
+                    .textContentType(.newPassword)
+                
+                if !viewModel.confirmPassword.isEmpty && viewModel.password != viewModel.confirmPassword {
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.red)
+                            .font(.caption)
+                        Text("Passwords do not match")
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
+                    .padding(.top, 4)
+                }
             }
             
             if let errorMessage = viewModel.errorMessage {
@@ -511,6 +578,22 @@ struct ModernTextFieldStyle: TextFieldStyle {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(Color(.systemGray4), lineWidth: 1)
             )
+    }
+}
+
+struct PasswordRequirementRow: View {
+    let text: String
+    let isMet: Bool
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: isMet ? "checkmark.circle.fill" : "circle")
+                .foregroundColor(isMet ? .green : .gray)
+                .font(.caption)
+            Text(text)
+                .font(.caption)
+                .foregroundColor(isMet ? .green : .gray)
+        }
     }
 }
 
