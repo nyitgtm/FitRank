@@ -261,15 +261,11 @@ struct ServingSizeInputView: View {
                             TextField("Amount", text: $servingSize)
                                 .keyboardType(.decimalPad)
                                 .textFieldStyle(.roundedBorder)
-                                .frame(width: 100)
                                 .focused($isInputFocused)
                             
-                            Picker("Unit", selection: $servingUnit) {
-                                Text("g").tag("g")
-                                Text("oz").tag("oz")
-                                Text("serving").tag("serving")
-                            }
-                            .pickerStyle(.segmented)
+                            Text("g")
+                                .foregroundColor(.secondary)
+                                .font(.subheadline)
                         }
                         
                         // Quick Amounts
@@ -294,7 +290,7 @@ struct ServingSizeInputView: View {
                     
                     // Nutrition Preview
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Nutrition for \(servingSize) \(servingUnit)")
+                        Text("Nutrition for \(servingSize)g")
                             .font(.headline)
                         
                         VStack(spacing: 12) {
