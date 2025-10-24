@@ -424,22 +424,30 @@ struct TeamSelectionStepView: View {
     @State private var isLoadingTeams = true
     
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Choose Your Team")
-                .font(.headline)
-                .foregroundColor(.primary)
+        VStack(spacing: 20) {
+            VStack(spacing: 8) {
+                Text("Choose Your Team")
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundColor(.primary)
+                
+                Text("This is your family. Choose wisely.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
             
             if isLoadingTeams {
                 ProgressView("Loading teams...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
+                VStack(spacing: 16) {
                     ForEach(teams) { team in
                         TeamSelectionCard(
                             team: team,
                             isSelected: viewModel.selectedTeam?.id == team.id,
                             onTap: {
-                                viewModel.selectedTeam = team
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    viewModel.selectedTeam = team
+                                }
                             }
                         )
                     }
@@ -502,36 +510,113 @@ struct TeamSelectionCard: View {
     let isSelected: Bool
     let onTap: () -> Void
     
+    private var teamImageName: String {
+        let slug = team.slug.lowercased()
+        print("Team slug: \(slug)") // Debug print
+        
+        if slug.contains("eagle") {
+            return "eagle"
+        } else if slug.contains("shark") {
+            return "shark"
+        } else if slug.contains("gorilla") {
+            return "gorilla"
+        } else {
+            print("No match found for slug: \(slug)")
+            return "eagle"
+        }
+    }
+    
+    private var fallbackIcon: String {
+        let slug = team.slug.lowercased()
+        if slug.contains("eagle") {
+            return "bird.fill"
+        } else if slug.contains("shark") {
+            return "flame.fill"
+        } else if slug.contains("gorilla") {
+            return "pawprint.fill"
+        } else {
+            return "star.fill"
+        }
+    }
+    
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 12) {
-                if let icon = team.icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 32))
-                        .foregroundColor(Color(team.color))
-                } else {
-                    Circle()
-                        .fill(Color(team.color))
-                        .frame(width: 40, height: 40)
-                }
-                
-                Text(team.name)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 120)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+            ZStack {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.yellow.opacity(0.15),
+                                Color.red.opacity(0.15),
+                                Color.blue.opacity(0.15)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-            )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(
+                                Color(team.color),
+                                lineWidth: isSelected ? 4 : 2
+                            )
+                    )
+                    .shadow(color: isSelected ? Color(team.color).opacity(0.4) : Color.clear, radius: 20, x: 0, y: 10)
+                
+                HStack(spacing: 20) {
+                    // Try to load image, fallback to SF Symbol
+                    if let uiImage = UIImage(named: teamImageName) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 80, height: 80)
+                            .scaleEffect(isSelected ? 1.1 : 1.0)
+                    } else {
+                        // Fallback to SF Symbol
+                        ZStack {
+                            Circle()
+                                .fill(Color(team.color).opacity(0.2))
+                                .frame(width: 80, height: 80)
+                            
+                            Image(systemName: fallbackIcon)
+                                .font(.system(size: 40, weight: .bold))
+                                .foregroundColor(Color(team.color))
+                        }
+                        .scaleEffect(isSelected ? 1.1 : 1.0)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(team.name)
+                            .font(.system(size: 26, weight: .heavy))
+                            .foregroundColor(.primary)
+                        
+                        if isSelected {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(Color(team.color))
+                                Text("SELECTED")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(Color(team.color))
+                            }
+                            .transition(.scale.combined(with: .opacity))
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                .padding(20)
+            }
+            .frame(height: 120)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 
