@@ -16,6 +16,7 @@ struct AddFoodView: View {
     @State private var errorMessage: String?
     @State private var selectedFood: Food?
     @State private var showingServingInput = false
+    @State private var searchTask: DispatchWorkItem?
     
     var body: some View {
         NavigationView {
@@ -25,8 +26,25 @@ struct AddFoodView: View {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.gray)
                     
-                    TextField("Search for food...", text: $searchQuery, onCommit: searchFoods)
+                    TextField("Search for food...", text: $searchQuery)
                         .textFieldStyle(.plain)
+                        .onChange(of: searchQuery) { newValue in
+                            // Cancel previous search task
+                            searchTask?.cancel()
+                            
+                            if newValue.isEmpty {
+                                foods = []
+                                errorMessage = nil
+                                isLoading = false
+                            } else if newValue.count >= 3 {
+                                // Create new search task with 0.5 second delay
+                                let task = DispatchWorkItem {
+                                    searchFoods()
+                                }
+                                searchTask = task
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
+                            }
+                        }
                     
                     if !searchQuery.isEmpty {
                         Button(action: { searchQuery = "" }) {
