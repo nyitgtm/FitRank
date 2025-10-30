@@ -225,28 +225,69 @@ struct ServingSizeInputView: View {
     let onAdd: (FoodEntry) -> Void
     
     @State private var servingSize: String = "100"
-    @State private var servingUnit: String = "g"
+    @State private var servingUnit: ServingUnitType = .grams
     @FocusState private var isInputFocused: Bool
+    
+    enum ServingUnitType: String, CaseIterable {
+        case grams = "g"
+        case ounces = "oz"
+        case pounds = "lb"
+        case kilograms = "kg"
+        
+        var displayName: String {
+            switch self {
+            case .grams: return "Grams"
+            case .ounces: return "Ounces"
+            case .pounds: return "Pounds"
+            case .kilograms: return "Kilograms"
+            }
+        }
+        
+        // Convert to grams
+        func toGrams(_ value: Double) -> Double {
+            switch self {
+            case .grams: return value
+            case .ounces: return value * 28.3495
+            case .pounds: return value * 453.592
+            case .kilograms: return value * 1000
+            }
+        }
+        
+        // Convert from grams
+        static func fromGrams(_ grams: Double, to unit: ServingUnitType) -> Double {
+            switch unit {
+            case .grams: return grams
+            case .ounces: return grams * 0.035274
+            case .pounds: return grams * 0.00220462
+            case .kilograms: return grams / 1000
+            }
+        }
+    }
     
     var servingSizeDouble: Double {
         let value = Double(servingSize) ?? 100.0
         return max(0, value) // Prevent negative values
     }
     
+    // Always store as grams in the backend
+    var servingSizeInGrams: Double {
+        servingUnit.toGrams(servingSizeDouble)
+    }
+    
     var scaledCalories: Double {
-        food.calories * (servingSizeDouble / 100.0)
+        food.calories * (servingSizeInGrams / 100.0)
     }
     
     var scaledProtein: Double {
-        food.protein * (servingSizeDouble / 100.0)
+        food.protein * (servingSizeInGrams / 100.0)
     }
     
     var scaledCarbs: Double {
-        food.carbs * (servingSizeDouble / 100.0)
+        food.carbs * (servingSizeInGrams / 100.0)
     }
     
     var scaledFat: Double {
-        food.fat * (servingSizeDouble / 100.0)
+        food.fat * (servingSizeInGrams / 100.0)
     }
     
     var body: some View {
@@ -275,23 +316,40 @@ struct ServingSizeInputView: View {
                         Text("Serving Size")
                             .font(.headline)
                         
-                        HStack {
+                        HStack(spacing: 12) {
                             TextField("Amount", text: $servingSize)
                                 .keyboardType(.decimalPad)
                                 .textFieldStyle(.roundedBorder)
                                 .focused($isInputFocused)
+                                .frame(maxWidth: 100)
                             
-                            Text("g")
-                                .foregroundColor(.secondary)
-                                .font(.subheadline)
+                            // Unit Picker
+                            Menu {
+                                ForEach(ServingUnitType.allCases, id: \.self) { unit in
+                                    Button(unit.displayName) {
+                                        servingUnit = unit
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(servingUnit.rawValue)
+                                        .foregroundColor(.primary)
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color(.systemGray5))
+                                .cornerRadius(8)
+                            }
                         }
                         
                         // Quick Amounts
                         HStack(spacing: 12) {
                             ForEach([50, 100, 150, 200], id: \.self) { amount in
-                                Button("\(amount)g") {
+                                Button("\(amount)\(servingUnit.rawValue)") {
                                     servingSize = "\(amount)"
-                                    servingUnit = "g"
                                 }
                                 .font(.caption)
                                 .foregroundColor(.blue)
@@ -301,6 +359,27 @@ struct ServingSizeInputView: View {
                                 .cornerRadius(8)
                             }
                         }
+                        
+                        // Unit Conversions
+                        if servingSizeDouble > 0 {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Conversions")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .fontWeight(.medium)
+                                
+                                HStack(spacing: 12) {
+                                    ForEach(ServingUnitType.allCases.filter { $0 != servingUnit }, id: \.self) { unit in
+                                        ConversionBadge(
+                                            value: String(format: unit == .pounds ? "%.3f" : (unit == .grams ? "%.0f" : "%.2f"),
+                                                        ServingUnitType.fromGrams(servingSizeInGrams, to: unit)),
+                                            unit: unit.rawValue
+                                        )
+                                    }
+                                }
+                            }
+                            .padding(.top, 8)
+                        }
                     }
                     .padding()
                     .background(Color(.systemBackground))
@@ -308,7 +387,7 @@ struct ServingSizeInputView: View {
                     
                     // Nutrition Preview
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Nutrition for \(servingSize)g")
+                        Text("Nutrition for \(servingSize)\(servingUnit.rawValue) (\(String(format: "%.0f", servingSizeInGrams))g)")
                             .font(.headline)
                         
                         VStack(spacing: 12) {
@@ -353,8 +432,8 @@ struct ServingSizeInputView: View {
             foodId: food.fdcId,
             name: food.description,
             brandName: food.brandOwner,
-            servingSize: servingSizeDouble,
-            servingUnit: servingUnit,
+            servingSize: servingSizeInGrams, // Always store in grams
+            servingUnit: "g", // Always store as grams
             calories: food.calories,
             protein: food.protein,
             carbs: food.carbs,
@@ -393,6 +472,26 @@ struct NutritionRow: View {
             }
         }
         .font(.subheadline)
+    }
+}
+
+// MARK: - Conversion Badge
+struct ConversionBadge: View {
+    let value: String
+    let unit: String
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(value)
+                .fontWeight(.semibold)
+            Text(unit)
+                .foregroundColor(.secondary)
+        }
+        .font(.caption)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color(.systemGray5))
+        .cornerRadius(6)
     }
 }
 
