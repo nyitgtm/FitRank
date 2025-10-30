@@ -21,6 +21,7 @@ Package.resolved
 # Environment Variables
 .env
 **/.env
+env
 
 # Firebase
 # GoogleService-Info.plist
