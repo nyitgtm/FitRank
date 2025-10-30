@@ -5,23 +5,41 @@ struct FoodDatabaseView: View {
     @State private var foods: [Food] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var searchTask: DispatchWorkItem?
 
     var body: some View {
         VStack {
             // Search Bar
             HStack {
-                TextField("Search food...", text: $query, onCommit: fetchFoods)
+                TextField("Search food...", text: $query)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .padding(.horizontal)
+                    .onChange(of: query) { newValue in
+                        // Cancel previous search task
+                        searchTask?.cancel()
+                        
+                        if newValue.isEmpty {
+                            foods = []
+                            errorMessage = nil
+                            isLoading = false
+                        } else if newValue.count >= 3 {
+                            // Create new search task with 0.5 second delay
+                            let task = DispatchWorkItem {
+                                fetchFoods()
+                            }
+                            searchTask = task
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
+                        }
+                    }
                 
-                Button(action: fetchFoods) {
-                    Image(systemName: "magnifyingglass")
-                        .padding(8)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
+                if !query.isEmpty {
+                    Button(action: { query = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.gray)
+                            .padding(8)
+                    }
+                    .padding(.trailing)
                 }
-                .padding(.trailing)
             }
             .padding(.top)
             
