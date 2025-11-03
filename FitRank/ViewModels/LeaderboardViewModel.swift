@@ -1,176 +1,210 @@
 import Foundation
 import FirebaseAuth
+import FirebaseFirestore
 import Combine
 
 @MainActor
 class LeaderboardViewModel: ObservableObject {
     @Published var globalLeaderboard: [LeaderboardEntry] = []
     @Published var teamLeaderboard: [LeaderboardEntry] = []
-    @Published var gymLeaderboard: [LeaderboardEntry] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var currentUserTeam: String = ""
     
     private let firebaseService = FirebaseService.shared
+    private let db = Firestore.firestore()
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Leaderboard Management
     
-    func fetchLeaderboards() {
-        isLoading = true
-        
-        // Simulate network delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.globalLeaderboard = self.calculateGlobalLeaderboard()
-            self.teamLeaderboard = self.calculateTeamLeaderboard()
-            self.gymLeaderboard = self.calculateGymLeaderboard()
-            self.isLoading = false
-        }
-    }
-    
-    func refreshLeaderboards() async {
+    func fetchLeaderboards(scoreType: ScoreType, liftType: LiftType? = nil) async {
         await MainActor.run {
             isLoading = true
         }
         
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        await MainActor.run {
-            self.globalLeaderboard = self.calculateGlobalLeaderboard()
-            self.teamLeaderboard = self.calculateTeamLeaderboard()
-            self.gymLeaderboard = self.calculateGymLeaderboard()
-            self.isLoading = false
+        do {
+            // Get current user's team
+            if let userId = Auth.auth().currentUser?.uid {
+                let user = try await firebaseService.getUser(userId: userId)
+                await MainActor.run {
+                    self.currentUserTeam = user.team
+                }
+            }
+            
+            // Fetch leaderboards based on score type
+            if scoreType == .tokens {
+                await fetchTokenLeaderboards()
+            } else {
+                guard let liftType = liftType else { return }
+                await fetchWeightLeaderboards(liftType: liftType)
+            }
+            
+            await MainActor.run {
+                self.isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
+            }
         }
     }
     
-    // MARK: - Mock Data for Development
+    // MARK: - Token Leaderboards
     
-    private func generateMockLeaderboard() -> [LeaderboardEntry] {
-        return [
-            LeaderboardEntry(
-                id: "user1",
-                rank: 1,
-                userId: "user1",
-                userName: "Fitrank Control",
-                team: "/teams/0",
-                score: 1500,
-                scoreType: .tokens,
-                liftType: .bench
-            ),
-            LeaderboardEntry(
-                id: "user2",
-                rank: 2,
-                userId: "user2",
-                userName: "John Doe",
-                team: "/teams/1",
-                score: 1200,
-                scoreType: .tokens,
-                liftType: .squat
-            ),
-            LeaderboardEntry(
-                id: "user3",
-                rank: 3,
-                userId: "user3",
-                userName: "Jane Smith",
-                team: "/teams/2",
-                score: 1100,
-                scoreType: .tokens,
-                liftType: .deadlift
-            ),
-            LeaderboardEntry(
-                id: "user4",
-                rank: 4,
-                userId: "user4",
-                userName: "Mike Johnson",
-                team: "/teams/0",
-                score: 950,
-                scoreType: .tokens,
-                liftType: .bench
-            ),
-            LeaderboardEntry(
-                id: "user5",
-                rank: 5,
-                userId: "user5",
-                userName: "Sarah Wilson",
-                team: "/teams/1",
-                score: 800,
-                scoreType: .tokens,
-                liftType: .squat
-            )
-        ]
+    private func fetchTokenLeaderboards() async {
+        do {
+            // Fetch all users ordered by tokens
+            let snapshot = try await db.collection("users")
+                .order(by: "tokens", descending: true)
+                .limit(to: 100)
+                .getDocuments()
+            
+            let entries = try snapshot.documents.compactMap { doc -> LeaderboardEntry? in
+                guard let userId = doc.documentID as String?,
+                      let name = doc.data()["name"] as? String,
+                      let username = doc.data()["username"] as? String,
+                      let team = doc.data()["team"] as? String,
+                      let tokens = doc.data()["tokens"] as? Int else {
+                    return nil
+                }
+                
+                return LeaderboardEntry(
+                    id: userId,
+                    rank: 0, // Will be set later
+                    userId: userId,
+                    userName: name,
+                    username: username,
+                    team: team,
+                    score: tokens,
+                    scoreType: .tokens,
+                    liftType: nil
+                )
+            }
+            
+            // Set ranks
+            let globalEntries = entries.enumerated().map { index, entry in
+                var updated = entry
+                updated.rank = index + 1
+                return updated
+            }
+            
+            // Filter for team
+            let teamEntries = entries.filter { $0.team == currentUserTeam }
+                .enumerated().map { index, entry in
+                    var updated = entry
+                    updated.rank = index + 1
+                    return updated
+                }
+            
+            await MainActor.run {
+                self.globalLeaderboard = globalEntries
+                self.teamLeaderboard = teamEntries
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+            }
+        }
     }
     
-    // MARK: - Leaderboard Calculations
+    // MARK: - Weight Leaderboards
     
-    private func calculateGlobalLeaderboard() -> [LeaderboardEntry] {
-        // For now, return mock data
-        // In production, this would query Firestore for actual user data
-        return generateMockLeaderboard().sorted { $0.score > $1.score }
-    }
-    
-    private func calculateTeamLeaderboard() -> [LeaderboardEntry] {
-        // For now, return mock data filtered by team
-        // In production, this would query Firestore for team-specific data
-        return generateMockLeaderboard().sorted { $0.score > $1.score }
-    }
-    
-    private func calculateGymLeaderboard() -> [LeaderboardEntry] {
-        // For now, return mock data
-        // In production, this would query Firestore for gym-specific data
-        return generateMockLeaderboard().sorted { $0.score > $1.score }
-    }
-    
-    // MARK: - Team Management
-    
-    // Note: These functions are now deprecated since we're using the Team model
-    // They're kept for backward compatibility but should be removed in favor of
-    // using TeamRepository.getTeam(byReference:) directly
-    
-    private func getTeamName(_ teamId: String) -> String {
-        // This should be replaced with TeamRepository.getTeam(byReference: teamId)?.name
-        return "Team" // Placeholder
-    }
-    
-    private func getTeamColor(_ teamId: String) -> String {
-        // This should be replaced with TeamRepository.getTeam(byReference: teamId)?.color
-        return "#666666" // Placeholder
+    private func fetchWeightLeaderboards(liftType: LiftType) async {
+        do {
+            // Fetch all published workouts for this lift type
+            let snapshot = try await db.collection("workouts")
+                .whereField("liftType", isEqualTo: liftType.rawValue)
+                .whereField("status", isEqualTo: "published")
+                .getDocuments()
+            
+            // Group by user and get max weight
+            var userMaxWeights: [String: (weight: Int, userId: String, name: String, username: String, team: String)] = [:]
+            
+            for doc in snapshot.documents {
+                guard let userId = doc.data()["userId"] as? String,
+                      let weight = doc.data()["weight"] as? Int else {
+                    continue
+                }
+                
+                if let existing = userMaxWeights[userId] {
+                    if weight > existing.weight {
+                        userMaxWeights[userId] = (weight, userId, existing.name, existing.username, existing.team)
+                    }
+                } else {
+                    // Fetch user data
+                    do {
+                        let user = try await firebaseService.getUser(userId: userId)
+                        userMaxWeights[userId] = (weight, userId, user.name, user.username, user.team)
+                    } catch {
+                        continue
+                    }
+                }
+            }
+            
+            // Convert to entries and sort
+            let entries = userMaxWeights.values.map { data in
+                LeaderboardEntry(
+                    id: data.userId,
+                    rank: 0,
+                    userId: data.userId,
+                    userName: data.name,
+                    username: data.username,
+                    team: data.team,
+                    score: data.weight,
+                    scoreType: .weight,
+                    liftType: liftType
+                )
+            }.sorted { $0.score > $1.score }
+            
+            // Set ranks
+            let globalEntries = entries.enumerated().map { index, entry in
+                var updated = entry
+                updated.rank = index + 1
+                return updated
+            }
+            
+            // Filter for team
+            let teamEntries = entries.filter { $0.team == currentUserTeam }
+                .enumerated().map { index, entry in
+                    var updated = entry
+                    updated.rank = index + 1
+                    return updated
+                }
+            
+            await MainActor.run {
+                self.globalLeaderboard = globalEntries
+                self.teamLeaderboard = teamEntries
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+            }
+        }
     }
 }
 
 // MARK: - Leaderboard Entry Model
 
-struct LeaderboardEntry: Identifiable {
+struct LeaderboardEntry: Identifiable, Equatable {
     let id: String
-    let rank: Int
+    var rank: Int
     let userId: String
     let userName: String
+    let username: String
     let team: String
     let score: Int
     let scoreType: ScoreType
     let liftType: LiftType?
     
-    init(id: String, rank: Int, userId: String, userName: String, team: String, score: Int, scoreType: ScoreType, liftType: LiftType? = nil) {
-        self.id = id
-        self.rank = rank
-        self.userId = userId
-        self.userName = userName
-        self.team = team
-        self.score = score
-        self.scoreType = scoreType
-        self.liftType = liftType
+    static func == (lhs: LeaderboardEntry, rhs: LeaderboardEntry) -> Bool {
+        lhs.id == rhs.id && lhs.rank == rhs.rank && lhs.score == rhs.score
     }
 }
 
-enum ScoreType {
-    case tokens
-    case weight
-    
-    var displayName: String {
-        switch self {
-        case .tokens: return "Tokens"
-        case .weight: return "Weight (lbs)"
-        }
-    }
+enum ScoreType: String, CaseIterable {
+    case tokens = "Tokens"
+    case weight = "Weight"
     
     var icon: String {
         switch self {
