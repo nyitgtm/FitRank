@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct LeaderboardView: View {
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = LeaderboardViewModel()
     @StateObject private var teamRepository = TeamRepository()
     @State private var selectedMetric: ScoreType = .tokens
@@ -136,6 +137,21 @@ struct LeaderboardView: View {
             }
             .navigationTitle("Leaderboard")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Back")
+                                .font(.system(size: 17))
+                        }
+                        .foregroundColor(.blue)
+                    }
+                }
+            }
         }
         .task {
             await teamRepository.fetchTeams()
