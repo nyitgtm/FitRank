@@ -48,6 +48,17 @@ struct Gym: Identifiable, Codable, Equatable {
         }
     }
     
+    // Regular initializer for manual creation
+    init(id: String? = nil, name: String, location: Location, bestSquat: LiftRecord? = nil, bestBench: LiftRecord? = nil, bestDeadlift: LiftRecord? = nil, ownerTeamId: String? = nil) {
+        self.id = id
+        self.name = name
+        self.location = location
+        self.bestSquat = bestSquat
+        self.bestBench = bestBench
+        self.bestDeadlift = bestDeadlift
+        self.ownerTeamId = ownerTeamId
+    }
+    
     // Custom encoder (in case you need to write back to Firestore)
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
