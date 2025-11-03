@@ -7,6 +7,7 @@ import Combine
 class LeaderboardViewModel: ObservableObject {
     @Published var globalLeaderboard: [LeaderboardEntry] = []
     @Published var teamLeaderboard: [LeaderboardEntry] = []
+    @Published var followingLeaderboard: [LeaderboardEntry] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var currentUserTeam: String = ""
@@ -82,7 +83,7 @@ class LeaderboardViewModel: ObservableObject {
                 )
             }
             
-            // Set ranks
+            // Set ranks for global
             let globalEntries = entries.enumerated().map { index, entry in
                 var updated = entry
                 updated.rank = index + 1
@@ -97,9 +98,13 @@ class LeaderboardViewModel: ObservableObject {
                     return updated
                 }
             
+            // Filter for following
+            let followingEntries = await filterFollowingEntries(entries)
+            
             await MainActor.run {
                 self.globalLeaderboard = globalEntries
                 self.teamLeaderboard = teamEntries
+                self.followingLeaderboard = followingEntries
             }
         } catch {
             await MainActor.run {
@@ -157,7 +162,7 @@ class LeaderboardViewModel: ObservableObject {
                 )
             }.sorted { $0.score > $1.score }
             
-            // Set ranks
+            // Set ranks for global
             let globalEntries = entries.enumerated().map { index, entry in
                 var updated = entry
                 updated.rank = index + 1
@@ -172,14 +177,53 @@ class LeaderboardViewModel: ObservableObject {
                     return updated
                 }
             
+            // Filter for following
+            let followingEntries = await filterFollowingEntries(entries)
+            
             await MainActor.run {
                 self.globalLeaderboard = globalEntries
                 self.teamLeaderboard = teamEntries
+                self.followingLeaderboard = followingEntries
             }
         } catch {
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
             }
+        }
+    }
+    
+    // MARK: - Following Filter
+    
+    private func filterFollowingEntries(_ entries: [LeaderboardEntry]) async -> [LeaderboardEntry] {
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            return []
+        }
+        
+        do {
+            // Get list of users current user is following
+            let friendsSnapshot = try await db.collection("users")
+                .document(currentUserId)
+                .collection("friends")
+                .getDocuments()
+            
+            let followingUserIds = Set(friendsSnapshot.documents.compactMap { doc in
+                doc.data()["userId"] as? String
+            })
+            
+            // Filter entries to only include followed users
+            let filteredEntries = entries.filter { entry in
+                followingUserIds.contains(entry.userId)
+            }
+            
+            // Re-rank the filtered entries
+            return filteredEntries.enumerated().map { index, entry in
+                var updated = entry
+                updated.rank = index + 1
+                return updated
+            }
+        } catch {
+            print("Error fetching following list: \(error.localizedDescription)")
+            return []
         }
     }
 }

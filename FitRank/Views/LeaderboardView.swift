@@ -10,6 +10,7 @@ struct LeaderboardView: View {
     enum LeaderboardTab: String, CaseIterable {
         case global = "Global"
         case team = "Team"
+        case following = "Following"
     }
     
     var body: some View {
@@ -85,7 +86,7 @@ struct LeaderboardView: View {
                     .padding(.top, 8)
                 }
                 
-                // Tab Selector (Global / Team)
+                // Tab Selector (Global / Team / Following)
                 Picker("Leaderboard Type", selection: $selectedTab) {
                     ForEach(LeaderboardTab.allCases, id: \.self) { tab in
                         Text(tab.rawValue).tag(tab)
@@ -120,6 +121,15 @@ struct LeaderboardView: View {
                             teamRepository: teamRepository
                         )
                         .tag(LeaderboardTab.team)
+                        
+                        LeaderboardContentView(
+                            entries: viewModel.followingLeaderboard,
+                            showTeam: true,
+                            teamRepository: teamRepository,
+                            emptyMessage: "You're not following anyone yet",
+                            emptySubMessage: "Follow friends to see their rankings here"
+                        )
+                        .tag(LeaderboardTab.following)
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                 }
@@ -141,6 +151,8 @@ struct LeaderboardContentView: View {
     let entries: [LeaderboardEntry]
     let showTeam: Bool
     @ObservedObject var teamRepository: TeamRepository
+    var emptyMessage: String = "No entries yet"
+    var emptySubMessage: String = "Be the first to compete!"
     
     var body: some View {
         if entries.isEmpty {
@@ -148,10 +160,10 @@ struct LeaderboardContentView: View {
                 Image(systemName: "trophy.fill")
                     .font(.system(size: 60))
                     .foregroundColor(.gray.opacity(0.4))
-                Text("No entries yet")
+                Text(emptyMessage)
                     .font(.headline)
                     .foregroundColor(.secondary)
-                Text("Be the first to compete!")
+                Text(emptySubMessage)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
