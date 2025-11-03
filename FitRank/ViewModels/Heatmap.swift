@@ -81,7 +81,6 @@ struct Heatmap: View {
     @State private var currentZoomLevel: Double = 0.05 // Track zoom level
     @State private var selectedGym: Gym? // Track selected gym for detail view
     @State private var showGymDetail = false // Control sheet presentation
-    @State private var isLoadingGymDetail = false // Show loading feedback
     
     // Computed property to check if map is zoomed in enough to show team labels
     private var isZoomedIn: Bool {
@@ -167,26 +166,6 @@ struct Heatmap: View {
                     Spacer()
                 }
             }
-            
-            // Loading overlay
-            if isLoadingGymDetail {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-                
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .tint(.white)
-                    Text("Loading gym details...")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                }
-                .padding(24)
-                .background(.ultraThinMaterial)
-                .cornerRadius(16)
-                .shadow(radius: 10)
-            }
         }
         .edgesIgnoringSafeArea(.all)
         .onAppear {
@@ -219,6 +198,8 @@ struct Heatmap: View {
                 NavigationView {
                     GymDetailView(gym: gym)
                 }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
         }
     }
@@ -233,12 +214,7 @@ struct Heatmap: View {
                 )) {
                     Button(action: {
                         selectedGym = gym
-                        isLoadingGymDetail = true
-                        // Small delay for visual feedback, then show sheet
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            showGymDetail = true
-                            isLoadingGymDetail = false
-                        }
+                        showGymDetail = true
                     }) {
                         VStack(spacing: 4) {
                             Circle()

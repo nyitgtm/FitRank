@@ -24,6 +24,7 @@ struct GymDetailView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // Content
                 ScrollView {
@@ -51,10 +52,9 @@ struct GymDetailView: View {
                     }
                     .padding()
                 }
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: viewModel.isInitialLoading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Gym Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
