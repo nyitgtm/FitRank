@@ -120,9 +120,13 @@ struct UploadView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button("Cancel") {
+                            resetForm()
                             dismiss()
                         }
                     }
+                }
+                .onDisappear {
+                    resetForm()
                 }
                 
             }
@@ -249,6 +253,23 @@ struct VideoUploadSection: View {
                         Text(videoURL.lastPathComponent)
                             .font(.caption)
                             .foregroundColor(.secondary)
+                        
+                        Button {
+                            self.videoURL = nil
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "xmark.circle.fill")
+                                Text("Remove Video")
+                            }
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.red)
+                            .cornerRadius(10)
+                        }
+                        .padding(.top, 4)
                     }
                 }
                 .frame(height: 180)
