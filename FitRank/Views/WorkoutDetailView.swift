@@ -36,6 +36,12 @@ struct WorkoutDetailView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
+                    // Video Player
+                    VideoPlayerView(videoURL: workout.videoUrl)
+                        .frame(height: 400)
+                        .cornerRadius(16)
+                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+                    
                     // Main info card
                     VStack(spacing: 16) {
                         // Lift type with icon
