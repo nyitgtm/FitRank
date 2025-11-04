@@ -19,7 +19,7 @@ Package.resolved
 
 
 # Environment Variables
-.env
+*.env
 **/.env
 env
 
