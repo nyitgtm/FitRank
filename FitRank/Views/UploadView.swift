@@ -44,8 +44,8 @@ struct UploadView: View {
             return weight
         }
         let barbellWeight = 45
-        let platesPerSide = (plate45Count * 45) + (plate25Count * 25) + (plate10Count * 10) + (plate5Count * 5) + (plate2_5Count * 2)
-        return barbellWeight + (platesPerSide * 2) // Both sides
+        let platesPerSide = Double((plate45Count * 45) + (plate25Count * 25) + (plate10Count * 10) + (plate5Count * 5)) + Double(plate2_5Count) * 2.5
+        return barbellWeight + Int(round(platesPerSide * 2)) // Both sides
     }
     
     private var totalPlatesPerSide: Int {
@@ -504,6 +504,14 @@ struct PlateRow: View {
     @Binding var count: Int
     let color: Color
     
+    private var weightText: String {
+        if weight.truncatingRemainder(dividingBy: 1) == 0 {
+            return "\(Int(weight))"
+        } else {
+            return String(format: "%.1f", weight)
+        }
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             // Plate icon
@@ -511,13 +519,13 @@ struct PlateRow: View {
                 .fill(color)
                 .frame(width: 40, height: 40)
                 .overlay(
-                    Text("\(Int(weight))")
+                    Text(weightText)
                         .font(.caption)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                 )
             
-            Text("\(Int(weight)) lb plate")
+            Text("\(weightText) lb plate")
                 .font(.subheadline)
                 .fontWeight(.medium)
             
