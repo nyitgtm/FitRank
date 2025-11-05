@@ -1,71 +1,84 @@
-//
-//  ThemeManager.swift
-//  FitRank
-//
-
 import SwiftUI
-import FirebaseAuth
-import FirebaseFirestore
+
+enum AppTheme: String, CaseIterable, Identifiable {
+    case light
+    case dark
+    case ocean
+    case sunset
+    case forest
+
+    var id: String { self.rawValue }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .light: return .light
+        case .dark: return .dark
+        case .ocean: return .dark // Ocean uses dark mode with cyan accents
+        case .sunset: return .light // Sunset uses light mode with warm colors
+        case .forest: return .dark // Forest uses dark mode with green accents
+        }
+    }
+
+    var accentColor: Color {
+        switch self {
+        case .light: return .blue
+        case .dark: return .blue
+        case .ocean: return Color.cyan
+        case .sunset: return Color.orange
+        case .forest: return Color.green
+        }
+    }
+    
+    var backgroundColor: Color {
+        switch self {
+        case .light: return Color(.systemBackground)
+        case .dark: return Color(.systemBackground)
+        case .ocean: return Color(red: 0.05, green: 0.15, blue: 0.25) // Deep ocean blue
+        case .sunset: return Color(red: 1.0, green: 0.95, blue: 0.9) // Warm sunset
+        case .forest: return Color(red: 0.1, green: 0.15, blue: 0.1) // Dark forest green
+        }
+    }
+    
+    var cardBackgroundColor: Color {
+        switch self {
+        case .light: return Color(.systemBackground)
+        case .dark: return Color(.systemBackground)
+        case .ocean: return Color(red: 0.1, green: 0.2, blue: 0.35)
+        case .sunset: return Color.white
+        case .forest: return Color(red: 0.15, green: 0.25, blue: 0.15)
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .light: return "Light"
+        case .dark: return "Dark"
+        case .ocean: return "Ocean"
+        case .sunset: return "Sunset"
+        case .forest: return "Forest"
+        }
+    }
+}
 
 class ThemeManager: ObservableObject {
     static let shared = ThemeManager()
     
-    @Published var isDarkMode: Bool = false {
+    @Published var selectedTheme: AppTheme {
         didSet {
-            // Save to UserDefaults for immediate persistence
-            UserDefaults.standard.set(isDarkMode, forKey: "isDarkMode")
-            // Sync to Firebase
-            syncToFirebase()
+            UserDefaults.standard.set(selectedTheme.rawValue, forKey: "app_theme")
         }
     }
     
-    private let db = Firestore.firestore()
+    // Computed property for backward compatibility
+    var isDarkMode: Bool {
+        get { selectedTheme == .dark }
+        set { selectedTheme = newValue ? .dark : .light }
+    }
     
     private init() {
-        // Load from UserDefaults first for immediate app launch
-        self.isDarkMode = UserDefaults.standard.bool(forKey: "isDarkMode")
-        // Then load from Firebase to get synced value
-        loadFromFirebase()
-    }
-    
-    var colorScheme: ColorScheme {
-        isDarkMode ? .dark : .light
-    }
-    
-    // Load dark mode preference from Firebase
-    func loadFromFirebase() {
-        guard let uid = Auth.auth().currentUser?.uid else { return }
-        
-        db.collection("users").document(uid).getDocument { [weak self] snapshot, error in
-            guard let self = self else { return }
-            
-            if let error = error {
-                print("❌ Error loading dark mode from Firebase: \(error.localizedDescription)")
-                return
-            }
-            
-            if let data = snapshot?.data(),
-               let isDarkMode = data["isDarkMode"] as? Bool {
-                DispatchQueue.main.async {
-                    self.isDarkMode = isDarkMode
-                    print("✅ Loaded dark mode from Firebase: \(isDarkMode)")
-                }
-            }
-        }
-    }
-    
-    // Save dark mode preference to Firebase
-    private func syncToFirebase() {
-        guard let uid = Auth.auth().currentUser?.uid else { return }
-        
-        db.collection("users").document(uid).updateData([
-            "isDarkMode": isDarkMode
-        ]) { error in
-            if let error = error {
-                print("❌ Error syncing dark mode to Firebase: \(error.localizedDescription)")
-            } else {
-                print("✅ Dark mode synced to Firebase: \(self.isDarkMode)")
-            }
-        }
+        let stored = UserDefaults.standard.string(forKey: "app_theme")
+        self.selectedTheme = AppTheme(rawValue: stored ?? "") ?? .light
     }
 }
+
+

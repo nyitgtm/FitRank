@@ -47,8 +47,7 @@ struct TabContainerView: View {
         .accentColor(.blue)
         .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
         .onAppear {
-            // Load theme from Firebase when app starts
-            themeManager.loadFromFirebase()
+            
         }
     }
 }
