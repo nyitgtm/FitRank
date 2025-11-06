@@ -34,10 +34,11 @@ struct WeeklyProgressSummary: Identifiable, Codable {
     let endDate: Date
     let dailyProgresses: [DailyProgress]
     let averageCalories: Int
-    let totalCalorieDeficit: Int
-    let projectedWeightLoss: Double // in pounds
+    let totalCalorieChange: Int // positive for surplus, negative for deficit
+    let projectedWeightChange: Double // in pounds (positive for gain, negative for loss)
     let maintenanceCalories: Int
-    let targetWeightLossPerWeek: Double // in pounds
+    let targetWeightChangePerWeek: Double // in pounds
+    let fitnessGoal: FitnessGoal
     
     var weekNumber: Int {
         Calendar.current.component(.weekOfYear, from: startDate)
@@ -48,24 +49,69 @@ struct WeeklyProgressSummary: Identifiable, Codable {
         formatter.dateFormat = "MMM d"
         return "\(formatter.string(from: startDate)) - \(formatter.string(from: endDate))"
     }
+    
+    var isOnTrack: Bool {
+        switch fitnessGoal {
+        case .cutting:
+            return projectedWeightChange <= -targetWeightChangePerWeek * 0.8 // Within 80% of goal
+        case .bulking:
+            return projectedWeightChange >= targetWeightChangePerWeek * 0.8 // Within 80% of goal
+        }
+    }
+}
+
+enum FitnessGoal: String, Codable, CaseIterable {
+    case cutting = "Cutting (Weight Loss)"
+    case bulking = "Bulking (Weight Gain)"
+    
+    var icon: String {
+        switch self {
+        case .cutting: return "arrow.down.circle.fill"
+        case .bulking: return "arrow.up.circle.fill"
+        }
+    }
+    
+    var displayName: String {
+        return self.rawValue
+    }
 }
 
 struct ProgressTrackerSettings: Identifiable, Codable {
     var id: String = UUID().uuidString
     var maintenanceCalories: Int = 2000
-    var targetWeightLossPerWeek: Double = 1.0 // pounds
+    var targetWeightChangePerWeek: Double = 1.0 // pounds (positive for both gain and loss)
     var currentWeight: Double = 180.0 // pounds
+    var fitnessGoal: FitnessGoal = .cutting
     var lastUpdated: Date = Date()
     
-    // Calculate daily calorie deficit needed
-    var dailyCalorieDeficitNeeded: Int {
+    // Calculate daily calorie surplus/deficit needed
+    var dailyCalorieChangeNeeded: Int {
         // 1 pound = 3500 calories
-        let weeklyCalorieDeficit = Int(targetWeightLossPerWeek * 3500)
-        return weeklyCalorieDeficit / 7
+        let weeklyCalorieChange = Int(targetWeightChangePerWeek * 3500)
+        return weeklyCalorieChange / 7
     }
     
     var targetDailyCalories: Int {
-        return maintenanceCalories - dailyCalorieDeficitNeeded
+        switch fitnessGoal {
+        case .cutting:
+            return maintenanceCalories - dailyCalorieChangeNeeded
+        case .bulking:
+            return maintenanceCalories + dailyCalorieChangeNeeded
+        }
+    }
+    
+    var goalLabel: String {
+        switch fitnessGoal {
+        case .cutting: return "Target Weight Loss"
+        case .bulking: return "Target Weight Gain"
+        }
+    }
+    
+    var calorieChangeLabel: String {
+        switch fitnessGoal {
+        case .cutting: return "Daily Deficit Needed"
+        case .bulking: return "Daily Surplus Needed"
+        }
     }
 }
 
@@ -85,18 +131,20 @@ struct ProgressData: Codable {
         guard !weekProgresses.isEmpty else { return nil }
         
         let avgCalories = Int(weekProgresses.map { Double($0.caloriesConsumed) }.reduce(0, +) / Double(weekProgresses.count))
-        let totalDeficit = weekProgresses.map { -$0.caloriesSurplus }.reduce(0, +) // negative surplus = deficit
-        let projectedWeightLoss = Double(totalDeficit) / 3500.0 // 3500 calories = 1 pound
+        let totalCalorieChange = weekProgresses.map { $0.caloriesSurplus }.reduce(0, +)
+        // Positive surplus = weight gain, negative surplus (deficit) = weight loss
+        let projectedWeightChange = Double(totalCalorieChange) / 3500.0 // 3500 calories = 1 pound
         
         return WeeklyProgressSummary(
             startDate: weekStart,
             endDate: weekEnd,
             dailyProgresses: weekProgresses.sorted { $0.date < $1.date },
             averageCalories: avgCalories,
-            totalCalorieDeficit: totalDeficit,
-            projectedWeightLoss: projectedWeightLoss,
+            totalCalorieChange: totalCalorieChange,
+            projectedWeightChange: projectedWeightChange,
             maintenanceCalories: settings.maintenanceCalories,
-            targetWeightLossPerWeek: settings.targetWeightLossPerWeek
+            targetWeightChangePerWeek: settings.targetWeightChangePerWeek,
+            fitnessGoal: settings.fitnessGoal
         )
     }
     
