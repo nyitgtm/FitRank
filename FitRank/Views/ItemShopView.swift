@@ -184,6 +184,8 @@ struct ShopTabSelector: View {
                         .font(.subheadline)
                         .fontWeight(selectedTab == tab ? .bold : .medium)
                         .foregroundColor(selectedTab == tab ? .black : .white)
+                        .lineLimit(1)                     
+                        .minimumScaleFactor(0.8)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(
@@ -192,6 +194,7 @@ struct ShopTabSelector: View {
                             Color.white.opacity(0.2)
                         )
                         .cornerRadius(20)
+
                 }
             }
         }
