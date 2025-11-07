@@ -1,84 +1,132 @@
 import SwiftUI
 
-enum AppTheme: String, CaseIterable, Identifiable {
+enum AppTheme: String, CaseIterable, Identifiable, Codable {
     case light
     case dark
     case ocean
     case sunset
     case forest
 
-    var id: String { self.rawValue }
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .light:  return "Light"
+        case .dark:   return "Dark"
+        case .ocean:  return "Ocean"
+        case .sunset: return "Sunset"
+        case .forest: return "Forest"
+        }
+    }
+
+    var isPremium: Bool {
+        switch self {
+        case .light, .dark, .ocean: return false
+        default:                    return true
+        }
+    }
+
 
     var colorScheme: ColorScheme? {
         switch self {
-        case .light: return .light
-        case .dark: return .dark
-        case .ocean: return .dark // Ocean uses dark mode with cyan accents
-        case .sunset: return .light // Sunset uses light mode with warm colors
-        case .forest: return .dark // Forest uses dark mode with green accents
+        case .light, .ocean, .sunset, .forest: return .light
+        case .dark:                             return .dark
         }
     }
 
     var accentColor: Color {
         switch self {
-        case .light: return .blue
-        case .dark: return .blue
-        case .ocean: return Color.cyan
-        case .sunset: return Color.orange
-        case .forest: return Color.green
+        case .light:  return .blue
+        case .dark:   return .purple
+        case .ocean:  return Color(red: 0.00, green: 0.60, blue: 0.75) // tropical teal-blue
+        case .sunset: return .orange
+        case .forest: return .green
         }
     }
-    
+
     var backgroundColor: Color {
         switch self {
-        case .light: return Color(.systemBackground)
-        case .dark: return Color(.systemBackground)
-        case .ocean: return Color(red: 0.05, green: 0.15, blue: 0.25) // Deep ocean blue
-        case .sunset: return Color(red: 1.0, green: 0.95, blue: 0.9) // Warm sunset
-        case .forest: return Color(red: 0.1, green: 0.15, blue: 0.1) // Dark forest green
+        case .dark:   return .black
+        case .ocean:  return Color(red: 0.04, green: 0.35, blue: 0.50) // deep sea base
+        default:      return Color(.systemGroupedBackground)
         }
     }
-    
+
     var cardBackgroundColor: Color {
         switch self {
-        case .light: return Color(.systemBackground)
-        case .dark: return Color(.systemBackground)
-        case .ocean: return Color(red: 0.1, green: 0.2, blue: 0.35)
-        case .sunset: return Color.white
-        case .forest: return Color(red: 0.15, green: 0.25, blue: 0.15)
+        case .dark:   return Color(.secondarySystemBackground)
+        case .ocean:  return Color(red: 0.12, green: 0.55, blue: 0.70).opacity(0.85)
+        default:      return Color(.systemBackground)
         }
     }
 
-    var displayName: String {
+    var gradientBackground: LinearGradient {
         switch self {
-        case .light: return "Light"
-        case .dark: return "Dark"
-        case .ocean: return "Ocean"
-        case .sunset: return "Sunset"
-        case .forest: return "Forest"
+        case .ocean:
+            return LinearGradient(
+                colors: [
+                    Color(red: 0.00, green: 0.45, blue: 0.65),
+                    Color(red: 0.00, green: 0.65, blue: 0.75),
+                    Color(red: 0.00, green: 0.80, blue: 0.85)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .dark:
+            return LinearGradient(colors: [.black, .gray.opacity(0.5)],
+                                  startPoint: .top, endPoint: .bottom)
+        default:
+            return LinearGradient(colors: [.white, .gray.opacity(0.06)],
+                                  startPoint: .top, endPoint: .bottom)
         }
     }
 }
 
-class ThemeManager: ObservableObject {
+
+@MainActor
+final class ThemeManager: ObservableObject {
     static let shared = ThemeManager()
-    
-    @Published var selectedTheme: AppTheme {
-        didSet {
-            UserDefaults.standard.set(selectedTheme.rawValue, forKey: "app_theme")
+    private init() { loadPersisted() }
+
+    private let kSelectedTheme = "fitrank.selectedTheme"
+    private let kUnlocked      = "fitrank.unlockedThemes"
+
+    @Published var selectedTheme: AppTheme = .dark {
+        didSet { persist() }
+    }
+    @Published var unlockedThemes: Set<String> = [] {
+        didSet { persist() }
+    }
+
+    func isUnlocked(_ theme: AppTheme) -> Bool {
+        !theme.isPremium || unlockedThemes.contains(theme.id)
+    }
+
+    func unlock(_ theme: AppTheme) {
+        guard theme.isPremium else { return }
+        unlockedThemes.insert(theme.id)
+    }
+
+    func resetToSystemDefaults() {
+        selectedTheme = .dark
+    }
+
+    private func persist() {
+        UserDefaults.standard.set(selectedTheme.id, forKey: kSelectedTheme)
+        UserDefaults.standard.set(Array(unlockedThemes), forKey: kUnlocked)
+    }
+
+    private func loadPersisted() {
+        if let id = UserDefaults.standard.string(forKey: kSelectedTheme),
+           let restored = AppTheme(rawValue: id) {
+            selectedTheme = restored
+        } else {
+            selectedTheme = .dark
+        }
+        if let saved = UserDefaults.standard.array(forKey: kUnlocked) as? [String] {
+            unlockedThemes = Set(saved)
+        } else {
+            unlockedThemes = []
         }
     }
-    
-    // Computed property for backward compatibility
-    var isDarkMode: Bool {
-        get { selectedTheme == .dark }
-        set { selectedTheme = newValue ? .dark : .light }
-    }
-    
-    private init() {
-        let stored = UserDefaults.standard.string(forKey: "app_theme")
-        self.selectedTheme = AppTheme(rawValue: stored ?? "") ?? .light
-    }
 }
-
-

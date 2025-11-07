@@ -6,11 +6,12 @@
 //
 
 import SwiftUI
+import FirebaseAuth
 
 struct ContentView: View {
-    @StateObject private var userViewModel = UserViewModel()
-    @State private var showSignInView = false
-    
+    @EnvironmentObject private var themeManager: ThemeManager
+    @State private var showSignInView = true
+
     var body: some View {
         Group {
             if showSignInView {
@@ -19,14 +20,14 @@ struct ContentView: View {
                 TabContainerView(showSignInView: $showSignInView)
             }
         }
+        .themedBackground()
+        .tint(themeManager.selectedTheme.accentColor)
         .onAppear {
-            userViewModel.checkAuthenticationStatus()
-            showSignInView = !userViewModel.isAuthenticated
+            showSignInView = (Auth.auth().currentUser == nil)
         }
     }
 }
 
-
 #Preview {
-    ContentView()
+    ContentView().environmentObject(ThemeManager.shared)
 }

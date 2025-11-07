@@ -1,57 +1,40 @@
-//
-//  TabContainerView.swift
-//  FitRank
-//
-//  Created by Navraj Singh on 8/9/25.
-//
-
 import SwiftUI
 
 struct TabContainerView: View {
-    @StateObject private var userViewModel = UserViewModel()
-    @StateObject private var themeManager = ThemeManager.shared
-    @Binding var showSignInView: Bool 
-    
+    @Binding var showSignInView: Bool
+    @EnvironmentObject private var themeManager: ThemeManager
+    @State private var selectedTab: Tab = .home
+
+    enum Tab: Hashable { case home, community, upload, nutrition, profile }
+
     var body: some View {
-        TabView {
-            HomeView()
-                .tabItem {
-                    Image(systemName: "house.fill")
-                    Text("Home")
-                }
-            
-            CommunityView()
-                .tabItem {
-                    Image(systemName: "person.3.fill")
-                    Text("Community")
-                }
-            
-            UploadView()
-                .tabItem {
-                    Image(systemName: "plus.circle.fill")
-                    Text("Upload")
-                }
-            
-            NutritionMainView()
-                .tabItem {
-                    Image(systemName: "fork.knife")
-                    Text("Nutrition")
-                }
-            
-            ProfileView(showSignInView: $showSignInView)
-                .tabItem {
-                    Image(systemName: "person.fill")
-                    Text("Profile")
-                }
-        }
-        .accentColor(.blue)
-        .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
-        .onAppear {
-            
+        TabView(selection: $selectedTab) {
+            NavigationView { HomeView() }
+                .tabItem { Label("Home", systemImage: "house.fill") }
+                .tag(Tab.home)
+
+            NavigationView { CommunityView() }
+                .tabItem { Label("Community", systemImage: "person.3.fill") }
+                .tag(Tab.community)
+
+            NavigationView { UploadView() }
+                .tabItem { Label("Upload", systemImage: "plus.app.fill") }
+                .tag(Tab.upload)
+
+            NavigationView { NutritionMainView() }
+                .tabItem { Label("Nutrition", systemImage: "takeoutbag.and.cup.and.straw.fill") }
+                .tag(Tab.nutrition)
+
+            NavigationView {
+                ProfileView(showSignInView: $showSignInView)
+            }
+            .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
+            .tag(Tab.profile)
         }
     }
 }
 
 #Preview {
     TabContainerView(showSignInView: .constant(false))
+        .environmentObject(ThemeManager.shared)
 }
