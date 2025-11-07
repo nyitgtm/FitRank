@@ -4,6 +4,8 @@
 //
 
 import Foundation
+import FirebaseAuth
+import FirebaseFirestore
 
 @MainActor
 class ShopViewModel: ObservableObject {
@@ -14,29 +16,34 @@ class ShopViewModel: ObservableObject {
     @Published var showingPurchaseSuccess = false
     @Published var lastPurchasedItem: ShopItem?
     
-    private let userDefaults = UserDefaults.standard
-    private let inventoryKey = "userInventory"
+    private let db = Firestore.firestore()
     
     init() {
-        loadInventory()
+        Task {
+            await loadInventory()
+        }
         loadShopItems()
     }
     
-    func loadInventory() {
-        if let data = userDefaults.data(forKey: inventoryKey),
-           let decoded = try? JSONDecoder().decode(UserInventory.self, from: data) {
-            inventory = decoded
-        } else {
-            // Default starting tokens
-            inventory = UserInventory(tokens: 1000)
-            saveInventory()
+    func loadInventory() async {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            // Get user's token balance from Firebase
+            let userDoc = try await db.collection("users").document(userId).getDocument()
+            if let tokens = userDoc.data()?["tokens"] as? Int {
+                inventory.tokens = tokens
+            }
+        } catch {
+            print("Failed to load tokens: \(error)")
         }
     }
     
-    func saveInventory() {
-        if let encoded = try? JSONEncoder().encode(inventory) {
-            userDefaults.set(encoded, forKey: inventoryKey)
-        }
+    func refreshTokenBalance() async {
+        await loadInventory()
     }
     
     func loadShopItems() {
@@ -45,6 +52,11 @@ class ShopViewModel: ObservableObject {
     }
     
     func purchaseItem(_ item: ShopItem) {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            errorMessage = "Please sign in to purchase items"
+            return
+        }
+        
         guard inventory.tokens >= item.price else {
             errorMessage = "Not enough tokens!"
             return
@@ -55,33 +67,42 @@ class ShopViewModel: ObservableObject {
             return
         }
         
-        // Deduct tokens
-        inventory.tokens -= item.price
-        
-        // Add to owned items
-        inventory.ownedItemIds.insert(item.id)
-        
-        // Auto-equip if it's the first of its type
-        switch item.type {
-        case .theme:
-            if inventory.equippedThemeId == nil {
-                inventory.equippedThemeId = item.id
+        Task {
+            do {
+                // Deduct tokens in Firebase
+                try await db.collection("users").document(userId).updateData([
+                    "tokens": FieldValue.increment(Int64(-item.price))
+                ])
+                
+                // Update local inventory
+                inventory.tokens -= item.price
+                inventory.ownedItemIds.insert(item.id)
+                
+                // Auto-equip if it's the first of its type
+                switch item.type {
+                case .theme:
+                    if inventory.equippedThemeId == nil {
+                        inventory.equippedThemeId = item.id
+                    }
+                case .badge:
+                    if inventory.equippedBadgeId == nil {
+                        inventory.equippedBadgeId = item.id
+                    }
+                case .title:
+                    if inventory.equippedTitleId == nil {
+                        inventory.equippedTitleId = item.id
+                    }
+                case .effect:
+                    break
+                }
+                
+                lastPurchasedItem = item
+                showingPurchaseSuccess = true
+                
+            } catch {
+                errorMessage = "Purchase failed: \(error.localizedDescription)"
             }
-        case .badge:
-            if inventory.equippedBadgeId == nil {
-                inventory.equippedBadgeId = item.id
-            }
-        case .title:
-            if inventory.equippedTitleId == nil {
-                inventory.equippedTitleId = item.id
-            }
-        case .effect:
-            break
         }
-        
-        saveInventory()
-        lastPurchasedItem = item
-        showingPurchaseSuccess = true
     }
     
     func equipItem(_ item: ShopItem) {
@@ -97,17 +118,5 @@ class ShopViewModel: ObservableObject {
         case .effect:
             break
         }
-        
-        saveInventory()
-    }
-    
-    func addTokens(_ amount: Int) {
-        inventory.tokens += amount
-        saveInventory()
-    }
-    
-    func resetInventory() {
-        inventory = UserInventory(tokens: 1000)
-        saveInventory()
     }
 }

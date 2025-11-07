@@ -51,6 +51,7 @@ struct CommunityNotification: Identifiable, Hashable {
 final class CommunityService {
     static let shared = CommunityService()
     private let db = Firestore.firestore()
+    private let dailyTasksService = DailyTasksService.shared
     private init() {}
 
    public var feedListener: ListenerRegistration?
@@ -267,6 +268,29 @@ final class CommunityService {
                         "createdAt": FieldValue.serverTimestamp()
                     ])
                 }
+                
+                // ✅ TRACK LIKE FOR DAILY TASKS (only when liking, not unliking)
+                do {
+                    let result = try await dailyTasksService.trackLike(userId: uid)
+                    
+                    if result.maxed {
+                        print("✅ Like progress: \(result.newCount)/\(DailyTasks.maxLikes) - READY TO CLAIM!")
+                        
+                        // Post notification that task is complete
+                        await MainActor.run {
+                            NotificationCenter.default.post(
+                                name: NSNotification.Name("DailyTaskComplete"),
+                                object: nil,
+                                userInfo: ["taskType": "likes", "count": result.newCount]
+                            )
+                        }
+                    } else {
+                        print("✅ Like progress: \(result.newCount)/\(DailyTasks.maxLikes)")
+                    }
+                } catch {
+                    print("Failed to track like: \(error)")
+                    // Don't fail the like if tracking fails
+                }
             }
         } catch {
             print("toggleLike error:", error)
@@ -297,6 +321,30 @@ final class CommunityService {
 
             try await db.collection("posts").document(postId)
                 .updateData(["commentCount": FieldValue.increment(Int64(1))])
+            
+            // ✅ AWARD COINS FOR COMMENTING
+            do {
+                let result = try await dailyTasksService.addCommentCoins(userId: uid)
+                
+                if result.coinsEarned > 0 {
+                    print("✅ Awarded \(result.coinsEarned) coins! Progress: \(result.newCount)/\(DailyTasks.maxComments)")
+                    
+                    // Post notification that coins were earned
+                    await MainActor.run {
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("CoinsEarned"),
+                            object: nil,
+                            userInfo: ["amount": result.coinsEarned]
+                        )
+                    }
+                } else if result.maxed {
+                    print("⚠️ Daily comment limit reached (3/3)")
+                }
+            } catch {
+                print("Failed to award coins: \(error)")
+                // Don't fail the comment if coin award fails
+            }
+            
         } catch {
             print("addComment error:", error)
         }
@@ -312,6 +360,8 @@ final class CommunityVM_Firebase: ObservableObject {
     @Published var showComposer = false
     @Published var draftText = ""
     @Published var draftImage: UIImage?
+    @Published var showCoinReward = false
+    @Published var coinsEarned = 0
     
     var unreadCount: Int {
         notifications.filter { !$0.isRead }.count
@@ -322,6 +372,29 @@ final class CommunityVM_Firebase: ObservableObject {
     init() { 
         listen()
         listenNotifications()
+        setupCoinNotifications()
+    }
+    
+    private func setupCoinNotifications() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("CoinsEarned"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            if let amount = notification.userInfo?["amount"] as? Int {
+                self?.coinsEarned = amount
+                self?.showCoinReward = true
+                
+                // Haptic feedback
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+                
+                // Hide after 2.5 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                    self?.showCoinReward = false
+                }
+            }
+        }
     }
 
     private func listen() {
