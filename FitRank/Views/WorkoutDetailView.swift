@@ -34,230 +34,7 @@ struct WorkoutDetailView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Video Player
-                    VideoPlayerView(videoURL: workout.videoUrl)
-                        .frame(height: 400)
-                        .cornerRadius(16)
-                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
-                    
-                    // Main info card
-                    VStack(spacing: 16) {
-                        // Lift type with icon
-                        HStack {
-                            Image(systemName: workout.liftTypeEnum.icon)
-                                .font(.system(size: 50))
-                                .foregroundColor(.blue)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(workout.liftTypeEnum.displayName)
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                
-                                Text("\(workout.weight) lbs")
-                                    .font(.system(size: 36, weight: .black, design: .rounded))
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.blue, .purple],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                            }
-                            
-                            Spacer()
-                        }
-                        
-                        Divider()
-                        
-                        // Status badge
-                        HStack {
-                            Text("Status")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            Spacer()
-                            
-                            Text(workout.statusEnum.displayName)
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(statusColor(workout.statusEnum))
-                                .cornerRadius(8)
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-                    
-                    // Engagement stats
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Image(systemName: "chart.bar.fill")
-                                .foregroundColor(.orange)
-                            Text("Engagement")
-                                .font(.headline)
-                                .fontWeight(.bold)
-                            Spacer()
-                        }
-                        
-                        HStack(spacing: 12) {
-                            EngagementBox(
-                                icon: "eye.fill",
-                                label: "Views",
-                                value: "\(workout.views)",
-                                color: .gray
-                            )
-                            
-                            EngagementBox(
-                                icon: "hand.thumbsup.fill",
-                                label: "Upvotes",
-                                value: "\(workout.upvotes)",
-                                color: .green
-                            )
-                            
-                            EngagementBox(
-                                icon: "hand.thumbsdown.fill",
-                                label: "Downvotes",
-                                value: "\(workout.downvotes)",
-                                color: .red
-                            )
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-                    
-                    // Location info
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Image(systemName: "mappin.circle.fill")
-                                .foregroundColor(.red)
-                            Text("Location")
-                                .font(.headline)
-                                .fontWeight(.bold)
-                            Spacer()
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            DetailRow(
-                                label: "Gym",
-                                value: gymName,
-                                icon: "building.2.fill"
-                            )
-                            
-                            if let address = gymAddress {
-                                DetailRow(
-                                    label: "Address",
-                                    value: address,
-                                    icon: "location.fill"
-                                )
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-                    
-                    // Team & User info
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Image(systemName: "person.3.fill")
-                                .foregroundColor(.purple)
-                            Text("Team & User")
-                                .font(.headline)
-                                .fontWeight(.bold)
-                            Spacer()
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            DetailRow(
-                                label: "Username",
-                                value: workoutUser?.username ?? "Loading...",
-                                icon: "person.fill"
-                            )
-                            
-                            DetailRow(
-                                label: "Name",
-                                value: workoutUser?.name ?? "Loading...",
-                                icon: "person.text.rectangle"
-                            )
-                            
-                            DetailRow(
-                                label: "Team",
-                                value: teamName,
-                                icon: "flag.fill"
-                            )
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-                    
-                    // Technical info
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Image(systemName: "info.circle.fill")
-                                .foregroundColor(.blue)
-                            Text("Technical Info")
-                                .font(.headline)
-                                .fontWeight(.bold)
-                            Spacer()
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            if let workoutId = workout.id {
-                                DetailRow(
-                                    label: "Workout ID",
-                                    value: workoutId,
-                                    icon: "number"
-                                )
-                            }
-                            
-                            DetailRow(
-                                label: "Video URL",
-                                value: workout.videoUrl,
-                                icon: "video.fill"
-                            )
-                            
-                            DetailRow(
-                                label: "Created",
-                                value: workout.createdAt.formatted(date: .long, time: .shortened),
-                                icon: "clock.fill"
-                            )
-                            
-                            DetailRow(
-                                label: "Time Ago",
-                                value: workout.createdAt.formatted(.relative(presentation: .named)),
-                                icon: "calendar"
-                            )
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-                }
-                .padding(20)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Workout Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                }
-            }
+            contentView
         }
         .task {
             await gymRepository.fetchGyms()
@@ -269,6 +46,257 @@ struct WorkoutDetailView: View {
                 print("Error fetching user: \(error)")
             }
         }
+    }
+    
+    private var contentView: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Video Player
+                videoSection
+                
+                // Main info card
+                mainInfoCard
+                
+                // Engagement stats
+                engagementStats
+                
+                // Location info
+                locationInfo
+                
+                // Team & User info
+                teamUserInfo
+                
+                // Technical info
+                technicalInfo
+            }
+            .padding(20)
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Workout Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
+                }
+                .fontWeight(.semibold)
+            }
+        }
+    }
+    
+    private var videoSection: some View {
+        VideoPlayerView(videoURL: workout.videoUrl)
+            .frame(height: 400)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+    
+    private var mainInfoCard: some View {
+        VStack(spacing: 16) {
+            // Lift type with icon
+            HStack {
+                Image(systemName: workout.liftTypeEnum.icon)
+                    .font(.system(size: 50))
+                    .foregroundColor(.blue)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(workout.liftTypeEnum.displayName)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text("\(workout.weight) lbs")
+                        .font(.system(size: 36, weight: .black, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                }
+                
+                Spacer()
+            }
+            
+            Divider()
+            
+            // Status badge
+            HStack {
+                Text("Status")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Text(workout.statusEnum.displayName)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(statusColor(workout.statusEnum))
+                    .cornerRadius(8)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+    
+    private var engagementStats: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .foregroundColor(.orange)
+                Text("Engagement")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Spacer()
+            }
+            
+            HStack(spacing: 12) {
+                EngagementBox(
+                    icon: "eye.fill",
+                    label: "Views",
+                    value: "\(workout.views)",
+                    color: .gray
+                )
+                
+                EngagementBox(
+                    icon: "hand.thumbsup.fill",
+                    label: "Upvotes",
+                    value: "—",
+                    color: .green
+                )
+                
+                EngagementBox(
+                    icon: "hand.thumbsdown.fill",
+                    label: "Downvotes",
+                    value: "—",
+                    color: .red
+                )
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+    
+    private var locationInfo: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "mappin.circle.fill")
+                    .foregroundColor(.red)
+                Text("Location")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Spacer()
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                DetailRow(
+                    label: "Gym",
+                    value: gymName,
+                    icon: "building.2.fill"
+                )
+                
+                if let address = gymAddress {
+                    DetailRow(
+                        label: "Address",
+                        value: address,
+                        icon: "location.fill"
+                    )
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+    
+    private var teamUserInfo: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "person.3.fill")
+                    .foregroundColor(.purple)
+                Text("Team & User")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Spacer()
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                DetailRow(
+                    label: "Username",
+                    value: workoutUser?.username ?? "Loading...",
+                    icon: "person.fill"
+                )
+                
+                DetailRow(
+                    label: "Name",
+                    value: workoutUser?.name ?? "Loading...",
+                    icon: "person.text.rectangle"
+                )
+                
+                DetailRow(
+                    label: "Team",
+                    value: teamName,
+                    icon: "flag.fill"
+                )
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+    
+    private var technicalInfo: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "info.circle.fill")
+                    .foregroundColor(.blue)
+                Text("Technical Info")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Spacer()
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                if let workoutId = workout.id {
+                    DetailRow(
+                        label: "Workout ID",
+                        value: workoutId,
+                        icon: "number"
+                    )
+                }
+                
+                DetailRow(
+                    label: "Video URL",
+                    value: workout.videoUrl,
+                    icon: "video.fill"
+                )
+                
+                DetailRow(
+                    label: "Created",
+                    value: workout.createdAt.formatted(date: .long, time: .shortened),
+                    icon: "clock.fill"
+                )
+                
+                DetailRow(
+                    label: "Time Ago",
+                    value: workout.createdAt.formatted(.relative(presentation: .named)),
+                    icon: "calendar"
+                )
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
     
     private func statusColor(_ status: WorkoutStatus) -> Color {

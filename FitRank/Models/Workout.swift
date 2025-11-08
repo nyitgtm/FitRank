@@ -12,8 +12,6 @@ struct Workout: Identifiable, Codable {
     var gymId: String? // Reference to gym ID, optional
     var status: String // Stored as string: "pending", "published", "removed"
     var views: Int
-    var upvotes: Int
-    var downvotes: Int
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -26,8 +24,6 @@ struct Workout: Identifiable, Codable {
         case gymId
         case status
         case views
-        case upvotes
-        case downvotes
     }
     
     init(id: String? = nil, userId: String, teamId: String, videoUrl: String, weight: Int, liftType: String, gymId: String? = nil, status: String = "pending") {
@@ -41,8 +37,6 @@ struct Workout: Identifiable, Codable {
         self.gymId = gymId
         self.status = status
         self.views = 0
-        self.upvotes = 0
-        self.downvotes = 0
     }
     
     // Computed property for lift type enum
@@ -53,18 +47,6 @@ struct Workout: Identifiable, Codable {
     // Computed property for status enum
     var statusEnum: WorkoutStatus {
         return WorkoutStatus(rawValue: status) ?? .pending
-    }
-    
-    // Computed property for form rating
-    var formRating: Double {
-        let totalVotes = upvotes + downvotes
-        guard totalVotes > 0 else { return 0.0 }
-        return Double(upvotes - downvotes) / Double(totalVotes)
-    }
-    
-    // Computed property for total votes
-    var totalVotes: Int {
-        return upvotes + downvotes
     }
 }
 

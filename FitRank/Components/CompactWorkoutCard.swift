@@ -31,11 +31,11 @@ struct CompactWorkoutCard: View {
             
             Divider()
             
-            // Stats row
+            // Stats row (Note: votes now in subcollection)
             HStack(spacing: 16) {
                 StatPill(icon: "eye.fill", value: "\(workout.views)", color: .secondary)
-                StatPill(icon: "hand.thumbsup.fill", value: "\(workout.upvotes)", color: .green)
-                StatPill(icon: "hand.thumbsdown.fill", value: "\(workout.downvotes)", color: .red)
+                StatPill(icon: "hand.thumbsup.fill", value: "—", color: .green)
+                StatPill(icon: "hand.thumbsdown.fill", value: "—", color: .red)
             }
             
             Spacer() // is this too much space, i think it looks fine lwk

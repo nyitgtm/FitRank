@@ -34,8 +34,9 @@ struct UserWorkoutsView: View {
         workoutViewModel.userWorkouts.reduce(0) { $0 + $1.weight }
     }
     
+    // Note: Upvotes now tracked in subcollection, would need to fetch separately
     private var totalUpvotes: Int {
-        workoutViewModel.userWorkouts.reduce(0) { $0 + $1.upvotes }
+        0 // TODO: Fetch from votes subcollection
     }
     
     private var favoriteLift: String {
@@ -437,7 +438,7 @@ struct WorkoutCardWithDelete: View {
                             .background(Color.red.opacity(0.1))
                             .clipShape(Circle())
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(.plain)
                 }
                 
                 Divider()
@@ -445,8 +446,9 @@ struct WorkoutCardWithDelete: View {
                 // Stats
                 HStack(spacing: 20) {
                     WorkoutStatItem(icon: "eye.fill", value: "\(workout.views)", color: .secondary)
-                    WorkoutStatItem(icon: "hand.thumbsup.fill", value: "\(workout.upvotes)", color: .green)
-                    WorkoutStatItem(icon: "hand.thumbsdown.fill", value: "\(workout.downvotes)", color: .red)
+                    // Note: Upvotes/downvotes now in subcollection
+                    WorkoutStatItem(icon: "hand.thumbsup.fill", value: "—", color: .green)
+                    WorkoutStatItem(icon: "hand.thumbsdown.fill", value: "—", color: .red)
                 }
                 
                 // Date and status
@@ -487,7 +489,7 @@ struct WorkoutCardWithDelete: View {
             .cornerRadius(16)
             .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
     }
     
     private func statusColor(_ status: WorkoutStatus) -> Color {
