@@ -6,79 +6,87 @@ import Combine
 struct ProfileView: View {
     @StateObject private var userViewModel = UserViewModel()
     @StateObject private var workoutViewModel = WorkoutViewModel()
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     @Binding var showSignInView: Bool
     
     var body: some View {
         NavigationView {
-                    ZStack {
-                        Color(.systemGroupedBackground)
-                            .ignoresSafeArea()
-                        
-                        if userViewModel.isLoading {
-                            ProgressView("Loading profile...")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                        } else if let user = userViewModel.currentUser {
-                            ScrollView {
-                                VStack(spacing: 28) {
-                                    
-                                    // Header
-                                    ModernProfileHeaderView(user: user)
-                                    
-                                    // Info Cards
-                                    VStack(spacing: 20) {
-                                        ProfileInfoCard(icon: "person.circle", title: "Full Name", value: user.name)
-                                        ProfileInfoCard(icon: "at", title: "Username", value: "@\(user.username)")
-                                        ProfileInfoCard(icon: "flag", title: "Team", value: user.team)
-                                        ProfileInfoCard(icon: "shield.lefthalf.fill", title: "Role", value: user.isCoach ? "Coach" : "Member")
-                                    }
-                                    
-                                    // Stats Section
-                                    StatsSectionModern(workoutCount: workoutViewModel.userWorkouts.count)
-                                    
-                                    // Dark Mode Toggle
-                                    DarkModeToggleCard(isDarkMode: $themeManager.isDarkMode)
-                                    
-                                    // Sign Out Button
-                                    VStack(spacing: 16) {
-                                        ModernActionButton(
-                                            icon: "rectangle.portrait.and.arrow.right",
-                                            title: "Sign Out",
-                                            color: .red
-                                        ) {
-                                            userViewModel.signOut()
-                                            showSignInView = true
-                                        }
-                                    }
-                                    
-                                    // Recent Workouts
-                                    ModernRecentWorkoutsSection(workouts: workoutViewModel.userWorkouts)
-                                }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 30)
+            ZStack {
+                themeManager.selectedTheme.backgroundColor
+                    .ignoresSafeArea()
+                
+                if userViewModel.isLoading {
+                    ProgressView("Loading profile...")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                } else if let user = userViewModel.currentUser {
+                    ScrollView {
+                        VStack(spacing: 28) {
+                            
+                            // Header
+                            ModernProfileHeaderView(user: user)
+                            
+                            // Info Cards
+                            VStack(spacing: 20) {
+                                ProfileInfoCard(icon: "person.circle", title: "Full Name", value: user.name)
+                                ProfileInfoCard(icon: "at", title: "Username", value: "@\(user.username)")
+                                ProfileInfoCard(icon: "flag", title: "Team", value: user.team)
+                                ProfileInfoCard(icon: "shield.lefthalf.fill", title: "Role", value: user.isCoach ? "Coach" : "Member")
                             }
-                        } else {
-                            ProgressView("Loading profile...")
+                            
+                            // Stats Section
+                            StatsSectionModern(workoutCount: workoutViewModel.userWorkouts.count)
+                            
+                            // Appearance Navigation Button
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Settings")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                
+                                NavigationLink(destination: AppearanceView()) {
+                                    AppearanceNavigationCard(currentTheme: themeManager.selectedTheme)
+                                }
+                            }
+                            
+                            // Sign Out Button
+                            VStack(spacing: 16) {
+                                ModernActionButton(
+                                    icon: "rectangle.portrait.and.arrow.right",
+                                    title: "Sign Out",
+                                    color: .red
+                                ) {
+                                    userViewModel.signOut()
+                                    showSignInView = true
+                                }
+                            }
+                            
+                            // Recent Workouts
+                            ModernRecentWorkoutsSection(workouts: workoutViewModel.userWorkouts)
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 30)
                     }
-                    .navigationTitle("Profile")
-                    .navigationBarTitleDisplayMode(.large)
-                    .refreshable {
-                        await loadUserAndWorkouts()
-                    }
-                    .task {
-                        await loadUserAndWorkouts()
-                    }
-                    .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
+                } else {
+                    ProgressView("Loading profile...")
+                }
+            }
+            .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.large)
+            .refreshable {
+                await loadUserAndWorkouts()
+            }
+            .task {
+                await loadUserAndWorkouts()
+            }
+            .preferredColorScheme(themeManager.selectedTheme.colorScheme)
+            .accentColor(themeManager.selectedTheme.accentColor)
         }
     }
     
     // MARK: - Helper function
     private func loadUserAndWorkouts() async {
         guard let uid = Auth.auth().currentUser?.uid else {
-            // No authenticated user, show sign in screen
             print("ProfileView: No authenticated user found")
             showSignInView = true
             return
@@ -91,22 +99,15 @@ struct ProfileView: View {
                 print("ProfileView: User fetched successfully - \(user.username)")
                 userViewModel.currentUser = user
                 
-                // Load dark mode preference from user profile
-                if let isDarkMode = user.isDarkMode {
-                    themeManager.isDarkMode = isDarkMode
-                    print("✅ Loaded dark mode from user profile: \(isDarkMode)")
-                }
                 // Fetch actual user workouts
                 await workoutViewModel.fetchAllUserWorkouts(userId: uid)
             } else {
-                // Firestore user not found, show sign in screen
                 print("ProfileView: User document not found in Firestore for UID: \(uid)")
                 showSignInView = true
             }
         } catch {
             print("ProfileView: Error fetching user - \(error.localizedDescription)")
             print("ProfileView: Full error - \(error)")
-            // Error fetching user, show sign in screen
             showSignInView = true
         }
     }
@@ -164,12 +165,13 @@ struct ProfileInfoCard: View {
     let icon: String
     let title: String
     let value: String
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundColor(.blue)
+                .foregroundColor(themeManager.selectedTheme.accentColor)
                 .frame(width: 30)
             
             VStack(alignment: .leading, spacing: 4) {
@@ -187,7 +189,7 @@ struct ProfileInfoCard: View {
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(themeManager.selectedTheme.cardBackgroundColor))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(.systemGray4), lineWidth: 0.5)
@@ -335,47 +337,51 @@ struct ModernRecentWorkoutsSection: View {
     }
 }
 
-// MARK: - Dark Mode Toggle Card
+// MARK: - Appearance Navigation Card
 
-struct DarkModeToggleCard: View {
-    @Binding var isDarkMode: Bool
+struct AppearanceNavigationCard: View {
+    let currentTheme: AppTheme
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Appearance")
+        HStack(spacing: 16) {
+            Image(systemName: iconForTheme(currentTheme))
                 .font(.title2)
-                .fontWeight(.semibold)
+                .foregroundColor(currentTheme.accentColor)
+                .frame(width: 30)
             
-            HStack(spacing: 16) {
-                Image(systemName: isDarkMode ? "moon.fill" : "sun.max.fill")
-                    .font(.title2)
-                    .foregroundColor(isDarkMode ? .purple : .orange)
-                    .frame(width: 30)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("APPEARANCE")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("DARK MODE")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Text(isDarkMode ? "Enabled" : "Disabled")
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                }
-                
-                Spacer()
-                
-                Toggle("", isOn: $isDarkMode)
-                    .labelsHidden()
-                    .tint(.blue)
+                Text(currentTheme.displayName)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(.systemGray4), lineWidth: 0.5)
-            )
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(.systemGray4), lineWidth: 0.5)
+        )
+    }
+    
+    private func iconForTheme(_ theme: AppTheme) -> String {
+        switch theme {
+        case .light: return "sun.max.fill"
+        case .dark: return "moon.fill"
+        case .ocean: return "drop.fill"
+        case .sunset: return "sun.horizon.fill"
+        case .forest: return "leaf.fill"
         }
     }
 }
@@ -383,3 +389,5 @@ struct DarkModeToggleCard: View {
 #Preview {
     ProfileView(showSignInView: .constant(false))
 }
+
+

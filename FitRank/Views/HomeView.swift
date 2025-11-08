@@ -3,6 +3,7 @@ import PhotosUI
 import FirebaseAuth
 
 struct HomeView: View {
+    @EnvironmentObject private var themeManager: ThemeManager
     @StateObject private var workoutViewModel = WorkoutViewModel()
     @StateObject private var userViewModel = UserViewModel()
     @StateObject private var gymRepository = GymRepository()
