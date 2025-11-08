@@ -66,10 +66,11 @@ class ProgressTrackerViewModel: ObservableObject {
         saveProgressData()
     }
     
-    func updateSettings(maintenanceCalories: Int, targetWeightLossPerWeek: Double, currentWeight: Double) {
+    func updateSettings(maintenanceCalories: Int, targetWeightChangePerWeek: Double, currentWeight: Double, fitnessGoal: FitnessGoal) {
         progressData.settings.maintenanceCalories = maintenanceCalories
-        progressData.settings.targetWeightLossPerWeek = targetWeightLossPerWeek
+        progressData.settings.targetWeightChangePerWeek = targetWeightChangePerWeek
         progressData.settings.currentWeight = currentWeight
+        progressData.settings.fitnessGoal = fitnessGoal
         progressData.settings.lastUpdated = Date()
         
         // Resync all progress with new maintenance calories

@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import FirebaseAuth
 import Combine
 
@@ -8,8 +9,11 @@ class CommentViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var isPosting = false
+    @Published var showCoinReward = false
+    @Published var coinsEarned = 0
     
     private let firebaseService = FirebaseService.shared
+    private let dailyTasksService = DailyTasksService.shared
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Comment Management
@@ -55,6 +59,28 @@ class CommentViewModel: ObservableObject {
             )
             
             try await firebaseService.createComment(comment)
+            
+            // Award coins for commenting (if not maxed out)
+            do {
+                let result = try await dailyTasksService.addCommentCoins(userId: currentUser.uid)
+                
+                if result.coinsEarned > 0 {
+                    coinsEarned = result.coinsEarned
+                    showCoinReward = true
+                    
+                    // Haptic feedback
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                    
+                    // Hide after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        self.showCoinReward = false
+                    }
+                }
+            } catch {
+                print("Failed to award coins: \(error)")
+                // Don't show error to user, comment was still posted
+            }
             
             // Refresh comments
             await fetchComments(for: workoutId)
@@ -161,5 +187,5 @@ class CommentViewModel: ObservableObject {
     func clearError() {
         errorMessage = nil
     }
+    
 }
-

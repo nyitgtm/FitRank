@@ -156,14 +156,14 @@ struct CalendarWeekView: View {
             VStack(spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Total Deficit")
+                        Text(weekProgress.fitnessGoal == .cutting ? "Total Deficit" : "Total Surplus")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         HStack(alignment: .firstTextBaseline, spacing: 2) {
-                            Text("\(weekProgress.totalCalorieDeficit)")
+                            Text("\(abs(weekProgress.totalCalorieChange))")
                                 .font(.title3)
                                 .fontWeight(.bold)
-                                .foregroundColor(.orange)
+                                .foregroundColor(weekProgress.fitnessGoal == .cutting ? .orange : .blue)
                             Text("cal")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
@@ -173,17 +173,17 @@ struct CalendarWeekView: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text("Projected Weight Loss")
+                        Text(weekProgress.fitnessGoal == .cutting ? "Projected Weight Loss" : "Projected Weight Gain")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         HStack(alignment: .firstTextBaseline, spacing: 2) {
-                            Image(systemName: "arrow.down.circle.fill")
+                            Image(systemName: weekProgress.fitnessGoal.icon)
                                 .font(.caption2)
-                                .foregroundColor(.green)
-                            Text(String(format: "%.2f", weekProgress.projectedWeightLoss))
+                                .foregroundColor(weekProgress.fitnessGoal == .cutting ? .green : .blue)
+                            Text(String(format: "%.2f", abs(weekProgress.projectedWeightChange)))
                                 .font(.title3)
                                 .fontWeight(.bold)
-                                .foregroundColor(.green)
+                                .foregroundColor(weekProgress.fitnessGoal == .cutting ? .green : .blue)
                             Text("lbs")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
@@ -229,23 +229,43 @@ struct CalendarDayCell: View {
     let day: DailyProgress
     let maintenanceCalories: Int
     
-    var weightLostPerDay: Double {
-        // Negative surplus = deficit
-        let deficit = -day.caloriesSurplus
-        return Double(deficit) / 3500.0 // Convert calories to pounds
+    // Determine if we're cutting or bulking based on context
+    // Negative surplus = deficit (cutting), Positive surplus = surplus (bulking)
+    var weightChangePerDay: Double {
+        // caloriesSurplus is positive when eating above maintenance
+        return Double(day.caloriesSurplus) / 3500.0 // Convert calories to pounds
     }
     
-    var deficitStatus: (emoji: String, color: Color, status: String) {
-        let deficit = -day.caloriesSurplus
-        
-        if deficit < 0 {
-            return ("⚠️", .red, "Over")
-        } else if deficit < 200 {
-            return ("📉", .orange, "Low")
-        } else if deficit < 500 {
-            return ("✅", .yellow, "Good")
+    var isCutting: Bool {
+        // If the person consumed fewer calories than maintenance, they're cutting
+        return day.caloriesSurplus < 0
+    }
+    
+    var calorieStatus: (emoji: String, color: Color, label: String) {
+        if isCutting {
+            // Cutting mode - negative surplus = deficit
+            let deficit = -day.caloriesSurplus
+            if deficit < 0 {
+                return ("⚠️", .red, "Over Maintenance")
+            } else if deficit < 200 {
+                return ("📉", .orange, "Low Deficit")
+            } else if deficit < 500 {
+                return ("✅", .yellow, "Good Deficit")
+            } else {
+                return ("🔥", .green, "Great Deficit")
+            }
         } else {
-            return ("🔥", .green, "Great")
+            // Bulking mode - positive surplus
+            let surplus = day.caloriesSurplus
+            if surplus < 0 {
+                return ("⚠️", .red, "Under Maintenance")
+            } else if surplus < 200 {
+                return ("📉", .orange, "Low Surplus")
+            } else if surplus < 500 {
+                return ("✅", .blue, "Good Surplus")
+            } else {
+                return ("💪", .purple, "Great Surplus")
+            }
         }
     }
     
@@ -265,19 +285,19 @@ struct CalendarDayCell: View {
                 
                 Spacer()
                 
-                // Weight lost
+                // Weight change
                 VStack(alignment: .trailing, spacing: 2) {
                     HStack(spacing: 4) {
-                        Image(systemName: "scalemass.fill")
+                        Image(systemName: weightChangePerDay < 0 ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
                             .font(.caption2)
-                        Text(String(format: "%.2f", weightLostPerDay))
+                        Text(String(format: "%.2f", abs(weightChangePerDay)))
                             .font(.subheadline)
                             .fontWeight(.bold)
                         Text("lbs")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
-                    .foregroundColor(.purple)
+                    .foregroundColor(weightChangePerDay < 0 ? .green : .blue)
                     
                     Text("\(day.caloriesConsumed) cal")
                         .font(.caption2)
@@ -289,21 +309,21 @@ struct CalendarDayCell: View {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
-                        Text("Deficit:")
+                        Text(isCutting ? "Deficit:" : "Surplus:")
                             .font(.caption2)
                             .foregroundColor(.secondary)
-                        Text(String(format: "%+d", -day.caloriesSurplus))
+                        Text(String(format: "%+d", day.caloriesSurplus))
                             .font(.caption2)
                             .fontWeight(.bold)
-                            .foregroundColor(deficitStatus.color)
+                            .foregroundColor(calorieStatus.color)
                     }
                     
                     ProgressView(value: Double(day.caloriesConsumed), total: Double(maintenanceCalories))
-                        .tint(day.caloriesSurplus < 0 ? .green : .orange)
+                        .tint(isCutting ? (day.caloriesSurplus < 0 ? .green : .red) : (day.caloriesSurplus > 0 ? .blue : .red))
                         .frame(height: 6)
                 }
                 
-                Text(deficitStatus.emoji)
+                Text(calorieStatus.emoji)
                     .font(.title3)
             }
             
@@ -348,6 +368,18 @@ struct SettingsSummaryCard: View {
     
     var body: some View {
         VStack(spacing: 16) {
+            // Goal Type Badge
+            HStack {
+                Image(systemName: settings.fitnessGoal.icon)
+                    .font(.title3)
+                    .foregroundColor(settings.fitnessGoal == .cutting ? .green : .blue)
+                Text(settings.fitnessGoal.displayName)
+                    .font(.headline)
+                    .foregroundColor(settings.fitnessGoal == .cutting ? .green : .blue)
+                Spacer()
+            }
+            .padding(.bottom, 8)
+            
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Daily Maintenance")
@@ -362,14 +394,14 @@ struct SettingsSummaryCard: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text("Target Weight Loss")
+                    Text(settings.goalLabel)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(String(format: "%.1f", settings.targetWeightLossPerWeek))
+                        Text(String(format: "%.1f", settings.targetWeightChangePerWeek))
                             .font(.title3)
                             .fontWeight(.bold)
-                            .foregroundColor(.green)
+                            .foregroundColor(settings.fitnessGoal == .cutting ? .green : .blue)
                         Text("lbs/week")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -381,13 +413,13 @@ struct SettingsSummaryCard: View {
             
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Daily Deficit Needed")
+                    Text(settings.calorieChangeLabel)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                    Text("\(settings.dailyCalorieDeficitNeeded)")
+                    Text("\(settings.dailyCalorieChangeNeeded)")
                         .font(.title3)
                         .fontWeight(.bold)
-                        .foregroundColor(.orange)
+                        .foregroundColor(settings.fitnessGoal == .cutting ? .orange : .purple)
                 }
                 
                 Spacer()
@@ -399,7 +431,7 @@ struct SettingsSummaryCard: View {
                     Text("\(settings.targetDailyCalories)")
                         .font(.title3)
                         .fontWeight(.bold)
-                        .foregroundColor(.green)
+                        .foregroundColor(settings.fitnessGoal == .cutting ? .green : .blue)
                 }
             }
         }
@@ -415,12 +447,30 @@ struct SettingsSheet: View {
     @ObservedObject var viewModel: ProgressTrackerViewModel
     
     @State private var maintenanceCalories: String = ""
-    @State private var targetWeightLossPerWeek: String = ""
+    @State private var targetWeightChangePerWeek: String = ""
     @State private var currentWeight: String = ""
+    @State private var selectedGoal: FitnessGoal = .cutting
     
     var body: some View {
         NavigationView {
             Form {
+                Section(header: Text("Fitness Goal")) {
+                    Picker("Goal", selection: $selectedGoal) {
+                        ForEach(FitnessGoal.allCases, id: \.self) { goal in
+                            HStack {
+                                Image(systemName: goal.icon)
+                                Text(goal.displayName)
+                            }
+                            .tag(goal)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    
+                    Text(selectedGoal == .cutting ? "Focus on losing body fat" : "Focus on building muscle mass")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
                 Section(header: Text("Daily Maintenance")) {
                     HStack {
                         TextField("Calories", text: $maintenanceCalories)
@@ -433,14 +483,16 @@ struct SettingsSheet: View {
                         .foregroundColor(.secondary)
                 }
                 
-                Section(header: Text("Weight Loss Goal")) {
+                Section(header: Text(selectedGoal == .cutting ? "Weight Loss Goal" : "Weight Gain Goal")) {
                     HStack {
-                        TextField("Weight Loss", text: $targetWeightLossPerWeek)
+                        TextField(selectedGoal == .cutting ? "Weight Loss" : "Weight Gain", text: $targetWeightChangePerWeek)
                             .keyboardType(.decimalPad)
                         Text("lbs/week")
                             .foregroundColor(.secondary)
                     }
-                    Text("Target weight loss per week (1-2 lbs is healthy)")
+                    Text(selectedGoal == .cutting 
+                         ? "Target weight loss per week (1-2 lbs is healthy)" 
+                         : "Target weight gain per week (0.5-1 lb is healthy for muscle)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -478,26 +530,28 @@ struct SettingsSheet: View {
             }
             .onAppear {
                 maintenanceCalories = "\(viewModel.progressData.settings.maintenanceCalories)"
-                targetWeightLossPerWeek = String(format: "%.1f", viewModel.progressData.settings.targetWeightLossPerWeek)
+                targetWeightChangePerWeek = String(format: "%.1f", viewModel.progressData.settings.targetWeightChangePerWeek)
                 currentWeight = String(format: "%.1f", viewModel.progressData.settings.currentWeight)
+                selectedGoal = viewModel.progressData.settings.fitnessGoal
             }
         }
     }
     
     private func saveSettings() {
         guard let maintenance = Int(maintenanceCalories),
-              let lossPerWeek = Double(targetWeightLossPerWeek),
+              let changePerWeek = Double(targetWeightChangePerWeek),
               let weight = Double(currentWeight),
               maintenance > 0,
-              lossPerWeek > 0,
+              changePerWeek > 0,
               weight > 0 else {
             return
         }
         
         viewModel.updateSettings(
             maintenanceCalories: maintenance,
-            targetWeightLossPerWeek: lossPerWeek,
-            currentWeight: weight
+            targetWeightChangePerWeek: changePerWeek,
+            currentWeight: weight,
+            fitnessGoal: selectedGoal
         )
         
         dismiss()

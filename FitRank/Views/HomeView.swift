@@ -15,6 +15,7 @@ struct HomeView: View {
     @State private var showingFriendRequests = false
     @State private var showingFriendsList = false
     @State private var showingFullScreenHeatmap = false
+    @State private var showingItemShop = false
     @State private var hasLoadedGyms = false
 
     enum WorkoutFilter: String, CaseIterable {
@@ -143,6 +144,29 @@ struct HomeView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 12) {
+                        // Item Shop button
+                        Button {
+                            showingItemShop = true
+                        } label: {
+                            ZStack {
+                                Image(systemName: "cart.fill")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.purple, .pink],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                
+                                // Sparkle effect
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.yellow)
+                                    .offset(x: 10, y: -8)
+                            }
+                        }
+                        
                         // Friend Requests Bell with badge
                         Button {
                             showingFriendRequests = true
@@ -192,6 +216,9 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingFriendsList) {
             FriendsListView()
+        }
+        .sheet(isPresented: $showingItemShop) {
+            ItemShopView()
         }
         .fullScreenCover(isPresented: $showingFullScreenHeatmap) {
             FullScreenHeatmapView(isPresented: $showingFullScreenHeatmap, gymRepository: gymRepository)

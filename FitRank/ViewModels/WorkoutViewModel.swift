@@ -11,6 +11,7 @@ class WorkoutViewModel: ObservableObject {
     
     private let firebaseService = FirebaseService.shared
     private let userViewModel = UserViewModel()
+    private let dailyTasksService = DailyTasksService.shared
     
     // MARK: - Mock Data for Development
     
@@ -121,6 +122,22 @@ class WorkoutViewModel: ObservableObject {
             )
             
             try await firebaseService.createWorkout(workout)
+            
+            // ✅ TRACK UPLOAD FOR DAILY TASK
+            if let userId = Auth.auth().currentUser?.uid {
+                do {
+                    let result = try await dailyTasksService.trackUpload(userId: userId)
+                    print("✅ Upload tracked! Progress: \(result.newCount)/\(DailyTasks.maxUploads)")
+                    
+                    if result.maxed {
+                        print("🎉 Upload task complete! Go claim your 100 coins!")
+                    }
+                } catch {
+                    print("Failed to track upload: \(error)")
+                    // Don't fail the workout creation if tracking fails
+                }
+            }
+            
             await fetchWorkouts()
         } catch {
             errorMessage = "Failed to create workout: \(error.localizedDescription)"
