@@ -6,9 +6,11 @@ import Combine
 struct ProfileView: View {
     @StateObject private var userViewModel = UserViewModel()
     @StateObject private var workoutViewModel = WorkoutViewModel()
+    @StateObject private var teamRepository = TeamRepository()
     @ObservedObject private var themeManager = ThemeManager.shared
     
     @Binding var showSignInView: Bool
+    @State private var teamName: String = "Loading..."
     
     var body: some View {
         NavigationView {
@@ -31,7 +33,7 @@ struct ProfileView: View {
                             VStack(spacing: 20) {
                                 ProfileInfoCard(icon: "person.circle", title: "Full Name", value: user.name)
                                 ProfileInfoCard(icon: "at", title: "Username", value: "@\(user.username)")
-                                ProfileInfoCard(icon: "flag", title: "Team", value: user.team)
+                                ProfileInfoCard(icon: "flag", title: "Team", value: teamName)
                                 ProfileInfoCard(icon: "shield.lefthalf.fill", title: "Role", value: user.isCoach ? "Coach" : "Member")
                             }
                             
@@ -95,9 +97,19 @@ struct ProfileView: View {
         print("ProfileView: Fetching user with UID: \(uid)")
         
         do {
+            // Fetch teams first
+            await teamRepository.fetchTeams()
+            
             if let user = try await UserRepository().getUser(uid: uid) {
                 print("ProfileView: User fetched successfully - \(user.username)")
                 userViewModel.currentUser = user
+                
+                // Resolve team name from team reference
+                if let team = teamRepository.getTeam(byReference: user.team) {
+                    teamName = team.name
+                } else {
+                    teamName = "No Team"
+                }
                 
                 // Fetch actual user workouts
                 await workoutViewModel.fetchAllUserWorkouts(userId: uid)
