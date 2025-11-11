@@ -56,15 +56,18 @@ struct TikTokFeedView: View {
     private func loadWorkouts() async {
         isLoading = true
         do {
-            // Fetch published workouts ordered by creation date
-            workouts = try await firebaseService.getPublishedWorkouts(limit: 20)
+            // Fetch ALL workouts for now (including pending)
+            // TODO: Filter by published only once moderation is set up
+            workouts = try await firebaseService.getAllWorkouts(limit: 50)
+            
+            print("✅ Loaded \(workouts.count) workouts")
             
             // Load vote data for first workout
             if let firstWorkout = workouts.first {
                 await loadVoteData(for: firstWorkout)
             }
         } catch {
-            print("Error loading workouts: \(error)")
+            print("❌ Error loading workouts: \(error)")
         }
         isLoading = false
     }

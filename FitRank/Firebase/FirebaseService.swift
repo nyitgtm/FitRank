@@ -112,6 +112,14 @@ class FirebaseService: ObservableObject {
             .getDocuments()
         return try snapshot.documents.compactMap { try $0.data(as: Workout.self) }
     }
+    
+    func getAllWorkouts(limit: Int = 50) async throws -> [Workout] {
+        let snapshot = try await db.collection("workouts")
+            .order(by: "createdAt", descending: true)
+            .limit(to: limit)
+            .getDocuments()
+        return try snapshot.documents.compactMap { try $0.data(as: Workout.self) }
+    }
 
     // MARK: - Rating Operations (Legacy - now use VoteService for voting)
 

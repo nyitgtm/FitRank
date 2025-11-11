@@ -13,7 +13,7 @@ struct TabContainerView: View {
                 .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(Tab.home)
 
-            NavigationView { CommunityView() }
+            NavigationView { CommunityTabView() }
                 .tabItem { Label("Community", systemImage: "person.3.fill") }
                 .tag(Tab.community)
 
