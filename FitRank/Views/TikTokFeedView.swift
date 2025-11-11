@@ -88,6 +88,10 @@ struct WorkoutFeedCard: View {
     
     @State private var player: AVPlayer?
     @State private var isPlaying = false
+    @State private var user: User?
+    @State private var gym: Gym?
+    @StateObject private var userRepository = UserRepository()
+    @StateObject private var gymRepository = GymRepository()
     
     private var voteCounts: (upvotes: Int, downvotes: Int) {
         voteService.voteCounts[workout.id ?? ""] ?? (0, 0)
@@ -126,9 +130,14 @@ struct WorkoutFeedCard: View {
                         HStack {
                             Image(systemName: "person.circle.fill")
                                 .font(.title2)
-                            Text("User") // TODO: Fetch username
-                                .font(.headline)
-                                .fontWeight(.bold)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(user?.name ?? "Loading...")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                Text("@\(user?.username ?? "user")")
+                                    .font(.subheadline)
+                                    .opacity(0.8)
+                            }
                         }
                         .foregroundColor(.white)
                         
@@ -136,10 +145,14 @@ struct WorkoutFeedCard: View {
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.9))
                         
-                        if let gymId = workout.gymId {
-                            Text("📍 Gym: \(gymId)") // TODO: Fetch gym name
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.8))
+                        if workout.gymId != nil {
+                            HStack(spacing: 4) {
+                                Image(systemName: "mappin.circle.fill")
+                                    .font(.caption)
+                                Text(gym?.name ?? "Loading gym...")
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.white.opacity(0.8))
                         }
                     }
                     
@@ -214,6 +227,9 @@ struct WorkoutFeedCard: View {
         }
         .onAppear {
             setupPlayer()
+            Task {
+                await loadUserAndGym()
+            }
         }
         .onDisappear {
             player?.pause()
@@ -258,6 +274,21 @@ struct WorkoutFeedCard: View {
             )
         } catch {
             print("Error voting: \(error)")
+        }
+    }
+    
+    private func loadUserAndGym() async {
+        // Load user
+        do {
+            user = try await userRepository.getUser(uid: workout.userId)
+        } catch {
+            print("Error loading user: \(error)")
+        }
+        
+        // Load gym if exists
+        if let gymId = workout.gymId {
+            await gymRepository.fetchGyms()
+            gym = gymRepository.gyms.first(where: { $0.id == gymId })
         }
     }
 }

@@ -40,11 +40,11 @@ class VoteService: ObservableObject {
             userVotes[workoutId] = voteType
         }
         
-        // Refresh vote counts
+        // Refresh vote counts by counting subcollection
         await fetchVoteCounts(workoutId: workoutId)
     }
     
-    /// Fetch vote counts for a workout
+    /// Fetch vote counts for a workout by counting subcollection documents
     func fetchVoteCounts(workoutId: String) async {
         do {
             let votesSnapshot = try await db.collection("workouts").document(workoutId)
