@@ -10,18 +10,25 @@ struct CommunityTabView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Segmented control to switch views
-            Picker("View", selection: $selectedView) {
-                Text("Workout Feed").tag(ViewType.feed)
-                Text("Posts").tag(ViewType.posts)
+            // Segmented control at the very top
+            VStack(spacing: 0) {
+                Picker("View", selection: $selectedView) {
+                    Text("Workout Feed").tag(ViewType.feed)
+                    Text("Posts").tag(ViewType.posts)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                
+                Divider()
             }
-            .pickerStyle(.segmented)
-            .padding()
+            .background(Color(.systemBackground))
             
             // Content
             Group {
                 if selectedView == .feed {
                     TikTokFeedView()
+                        .ignoresSafeArea(edges: .bottom)
                 } else {
                     CommunityView()
                 }

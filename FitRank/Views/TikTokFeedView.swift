@@ -38,7 +38,6 @@ struct TikTokFeedView: View {
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .ignoresSafeArea()
             }
         }
         .task {
@@ -101,128 +100,133 @@ struct WorkoutFeedCard: View {
         voteService.userVotes[workout.id ?? ""]
     }
     
-    var body: some View {
-        ZStack {
-            // Video Player
-            if let url = URL(string: workout.videoUrl) {
-                VideoPlayer(player: player)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        togglePlayPause()
+    private var actionButtons: some View {
+        VStack(spacing: 24) {
+            // Upvote
+            VStack(spacing: 4) {
+                Button {
+                    Task {
+                        await handleVote(.upvote)
                     }
+                } label: {
+                    Image(systemName: userVote == .upvote ? "hand.thumbsup.fill" : "hand.thumbsup")
+                        .font(.title2)
+                        .foregroundColor(userVote == .upvote ? .green : .white)
+                }
+                Text("\(voteCounts.upvotes)")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
             }
             
-            // Gradient overlay for better text visibility
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.7)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            
-            // Content Overlay
-            VStack {
-                Spacer()
-                
-                HStack(alignment: .bottom) {
-                    // Left side - Info
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "person.circle.fill")
-                                .font(.title2)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(user?.name ?? "Loading...")
-                                    .font(.headline)
-                                    .fontWeight(.bold)
-                                Text("@\(user?.username ?? "user")")
-                                    .font(.subheadline)
-                                    .opacity(0.8)
-                            }
-                        }
-                        .foregroundColor(.white)
-                        
-                        Text("\(workout.weight) lbs • \(workout.liftTypeEnum.displayName)")
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.9))
-                        
-                        if workout.gymId != nil {
-                            HStack(spacing: 4) {
-                                Image(systemName: "mappin.circle.fill")
-                                    .font(.caption)
-                                Text(gym?.name ?? "Loading gym...")
-                                    .font(.caption)
-                            }
-                            .foregroundColor(.white.opacity(0.8))
-                        }
+            // Downvote
+            VStack(spacing: 4) {
+                Button {
+                    Task {
+                        await handleVote(.downvote)
                     }
-                    
+                } label: {
+                    Image(systemName: userVote == .downvote ? "hand.thumbsdown.fill" : "hand.thumbsdown")
+                        .font(.title2)
+                        .foregroundColor(userVote == .downvote ? .red : .white)
+                }
+                Text("\(voteCounts.downvotes)")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+            }
+            
+            // Comments
+            VStack(spacing: 4) {
+                Button {
+                    showComments = true
+                } label: {
+                    Image(systemName: "text.bubble")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
+                Text("0") // TODO: Fetch comment count
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+            }
+            
+            // Share
+            VStack(spacing: 4) {
+                Button {
+                    // TODO: Share functionality
+                } label: {
+                    Image(systemName: "arrowshape.turn.up.right")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
+            }
+        }
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Video Player
+                if let url = URL(string: workout.videoUrl) {
+                    VideoPlayer(player: player)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .onTapGesture {
+                            togglePlayPause()
+                        }
+                }
+                
+                // Gradient overlay for better text visibility
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.7)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+                
+                // Content Overlay
+                VStack {
                     Spacer()
                     
-                    // Right side - Actions
-                    VStack(spacing: 24) {
-                        // Upvote
-                        VStack(spacing: 4) {
-                            Button {
-                                Task {
-                                    await handleVote(.upvote)
+                    HStack(alignment: .bottom) {
+                        // Left side - Info
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.title2)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(user?.name ?? "Loading...")
+                                        .font(.headline)
+                                        .fontWeight(.bold)
+                                    Text("@\(user?.username ?? "user")")
+                                        .font(.subheadline)
+                                        .opacity(0.8)
                                 }
-                            } label: {
-                                Image(systemName: userVote == .upvote ? "hand.thumbsup.fill" : "hand.thumbsup")
-                                    .font(.title2)
-                                    .foregroundColor(userVote == .upvote ? .green : .white)
                             }
-                            Text("\(voteCounts.upvotes)")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                        }
-                        
-                        // Downvote
-                        VStack(spacing: 4) {
-                            Button {
-                                Task {
-                                    await handleVote(.downvote)
+                            .foregroundColor(.white)
+                            
+                            Text("\(workout.weight) lbs • \(workout.liftTypeEnum.displayName)")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.9))
+                            
+                            if workout.gymId != nil {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "mappin.circle.fill")
+                                        .font(.caption)
+                                    Text(gym?.name ?? "Loading gym...")
+                                        .font(.caption)
                                 }
-                            } label: {
-                                Image(systemName: userVote == .downvote ? "hand.thumbsdown.fill" : "hand.thumbsdown")
-                                    .font(.title2)
-                                    .foregroundColor(userVote == .downvote ? .red : .white)
+                                .foregroundColor(.white.opacity(0.8))
                             }
-                            Text("\(voteCounts.downvotes)")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
                         }
                         
-                        // Comments
-                        VStack(spacing: 4) {
-                            Button {
-                                showComments = true
-                            } label: {
-                                Image(systemName: "text.bubble")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
-                            }
-                            Text("0") // TODO: Fetch comment count
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                        }
+                        Spacer()
                         
-                        // Share
-                        VStack(spacing: 4) {
-                            Button {
-                                // TODO: Share functionality
-                            } label: {
-                                Image(systemName: "arrowshape.turn.up.right")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
-                            }
-                        }
+                        // Right side - Actions
+                        actionButtons
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 32)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 32)
             }
         }
         .onAppear {
