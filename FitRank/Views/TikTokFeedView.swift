@@ -124,8 +124,10 @@ struct WorkoutFeedCard: View {
     @State private var user: User?
     @State private var gym: Gym?
     @State private var isLoadingGym = true
+    @State private var commentCount = 0
     @StateObject private var userRepository = UserRepository()
     @StateObject private var gymRepository = GymRepository()
+    @StateObject private var commentService = CommentService.shared
     
     private var voteCounts: (upvotes: Int, downvotes: Int) {
         voteService.voteCounts[workout.id ?? ""] ?? (0, 0)
@@ -180,7 +182,7 @@ struct WorkoutFeedCard: View {
                         .font(.title2)
                         .foregroundColor(.white)
                 }
-                Text("0") // TODO: Fetch comment count
+                Text("\(commentCount)")
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
@@ -297,11 +299,23 @@ struct WorkoutFeedCard: View {
                 }
             }
         }
+        .sheet(isPresented: $showComments) {
+            if let workoutID = workout.id {
+                CommentsSheetView(workoutID: workoutID)
+                    .onDisappear {
+                        // Refresh comment count when sheet closes
+                        Task {
+                            await loadCommentCount()
+                        }
+                    }
+            }
+        }
         .onAppear {
             print("🎬 Card appeared for workout: \(workout.id ?? "unknown")")
             setupPlayer()
             Task {
                 await loadUserAndGym()
+                await loadCommentCount()
             }
         }
         .onDisappear {
@@ -454,6 +468,14 @@ struct WorkoutFeedCard: View {
             await MainActor.run {
                 self.isLoadingGym = false
             }
+        }
+    }
+    
+    private func loadCommentCount() async {
+        guard let workoutID = workout.id else { return }
+        await commentService.fetchComments(workoutID: workoutID)
+        await MainActor.run {
+            self.commentCount = commentService.commentCounts[workoutID] ?? 0
         }
     }
 }
