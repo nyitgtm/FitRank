@@ -120,6 +120,19 @@ class FirebaseService: ObservableObject {
             .getDocuments()
         return try snapshot.documents.compactMap { try $0.data(as: Workout.self) }
     }
+    
+    // MARK: - View Tracking
+    
+    func incrementViewCount(workoutId: String) async {
+        do {
+            try await db.collection("workouts")
+                .document(workoutId)
+                .updateData(["views": FieldValue.increment(Int64(1))])
+            print("👁️ Incremented view count for workout \(workoutId)")
+        } catch {
+            print("❌ Error incrementing view count: \(error)")
+        }
+    }
 
     // MARK: - Rating Operations (Legacy - now use VoteService for voting)
 

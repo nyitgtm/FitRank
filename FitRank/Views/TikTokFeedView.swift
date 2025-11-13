@@ -125,6 +125,7 @@ struct WorkoutFeedCard: View {
     @State private var gym: Gym?
     @State private var isLoadingGym = true
     @State private var commentCount = 0
+    @State private var hasIncrementedView = false
     @StateObject private var userRepository = UserRepository()
     @StateObject private var gymRepository = GymRepository()
     @StateObject private var commentService = CommentService.shared
@@ -197,6 +198,17 @@ struct WorkoutFeedCard: View {
                         .font(.title2)
                         .foregroundColor(.white)
                 }
+            }
+            
+            // Views
+            VStack(spacing: 4) {
+                Image(systemName: "eye")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                Text("\(formatViewCount(workout.views))")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
             }
         }
     }
@@ -316,6 +328,7 @@ struct WorkoutFeedCard: View {
             Task {
                 await loadUserAndGym()
                 await loadCommentCount()
+                await incrementView()
             }
         }
         .onDisappear {
@@ -476,6 +489,34 @@ struct WorkoutFeedCard: View {
         await commentService.fetchComments(workoutID: workoutID)
         await MainActor.run {
             self.commentCount = commentService.commentCounts[workoutID] ?? 0
+        }
+    }
+    
+    private func incrementView() async {
+        guard let workoutID = workout.id else { return }
+        
+        // Only increment once per card instance
+        guard !hasIncrementedView else {
+            print("⏭️ View already incremented for this workout")
+            return
+        }
+        
+        await FirebaseService.shared.incrementViewCount(workoutId: workoutID)
+        
+        await MainActor.run {
+            hasIncrementedView = true
+        }
+    }
+    
+    private func formatViewCount(_ count: Int) -> String {
+        if count < 1000 {
+            return "\(count)"
+        } else if count < 1_000_000 {
+            let thousands = Double(count) / 1000.0
+            return String(format: "%.1fK", thousands)
+        } else {
+            let millions = Double(count) / 1_000_000.0
+            return String(format: "%.1fM", millions)
         }
     }
 }
