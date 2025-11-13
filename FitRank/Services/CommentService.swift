@@ -17,23 +17,35 @@ class CommentService: ObservableObject {
     
     func fetchComments(workoutID: String) async {
         do {
+            print("📥 Fetching comments for workout: \(workoutID)")
+            
             let snapshot = try await db.collection("workouts")
                 .document(workoutID)
                 .collection("comments")
-                .whereField("parentCommentID", isEqualTo: NSNull())
                 .order(by: "timestamp", descending: true)
                 .getDocuments()
             
-            let fetchedComments = snapshot.documents.compactMap { doc -> Comment? in
-                try? doc.data(as: Comment.self)
+            print("📄 Found \(snapshot.documents.count) total documents")
+            
+            let allComments = snapshot.documents.compactMap { doc -> Comment? in
+                do {
+                    let comment = try doc.data(as: Comment.self)
+                    print("📝 Comment: \(comment.content), parentID: \(comment.parentCommentID ?? "nil")")
+                    return comment
+                } catch {
+                    print("❌ Error decoding comment \(doc.documentID): \(error)")
+                    return nil
+                }
             }
+            
+            let fetchedComments = allComments.filter { $0.parentCommentID == nil } // Filter for top-level comments
             
             await MainActor.run {
                 self.comments[workoutID] = fetchedComments
                 self.commentCounts[workoutID] = fetchedComments.count
             }
             
-            print("✅ Fetched \(fetchedComments.count) comments for workout \(workoutID)")
+            print("✅ Fetched \(fetchedComments.count) top-level comments for workout \(workoutID)")
         } catch {
             print("❌ Error fetching comments: \(error)")
         }
