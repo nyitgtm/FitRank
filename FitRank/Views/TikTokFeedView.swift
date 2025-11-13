@@ -216,6 +216,14 @@ struct WorkoutFeedCard: View {
                         .tint(.white)
                 }
                 
+                // Tap area for play/pause (only center portion, not sides)
+                Color.clear
+                    .frame(width: geometry.size.width * 0.6) // Only 60% of width in center
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        togglePlayPause()
+                    }
+                
                 // Pause Icon Overlay (show before gradient so it's visible)
                 if !isPlaying {
                     Image(systemName: "pause.circle.fill")
@@ -277,21 +285,16 @@ struct WorkoutFeedCard: View {
                                 .foregroundColor(.white.opacity(0.8))
                             }
                         }
+                        .allowsHitTesting(false)
                         
                         Spacer()
                         
                         // Right side - Actions
                         actionButtons
-                            .allowsHitTesting(true)
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 32)
-                    .allowsHitTesting(false) // Allow taps to pass through except for buttons
                 }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                togglePlayPause()
             }
         }
         .onAppear {
