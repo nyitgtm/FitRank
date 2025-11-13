@@ -2,6 +2,38 @@ import SwiftUI
 import AVKit
 import FirebaseAuth
 
+// Custom video player layer for TikTok-style feed
+struct CustomVideoPlayer: UIViewRepresentable {
+    let player: AVPlayer
+    
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        view.backgroundColor = .black
+        
+        let playerLayer = AVPlayerLayer(player: player)
+        playerLayer.videoGravity = .resizeAspectFill
+        playerLayer.frame = view.bounds
+        view.layer.addSublayer(playerLayer)
+        
+        context.coordinator.playerLayer = playerLayer
+        return view
+    }
+    
+    func updateUIView(_ uiView: UIView, context: Context) {
+        DispatchQueue.main.async {
+            context.coordinator.playerLayer?.frame = uiView.bounds
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator {
+        var playerLayer: AVPlayerLayer?
+    }
+}
+
 struct TikTokFeedView: View {
     @StateObject private var voteService = VoteService.shared
     @State private var workouts: [Workout] = []
@@ -35,6 +67,7 @@ struct TikTokFeedView: View {
                             showComments: $showComments
                         )
                         .tag(index)
+                        .id(workout.id) // Force recreate on workout change
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
@@ -87,6 +120,7 @@ struct WorkoutFeedCard: View {
     
     @State private var player: AVPlayer?
     @State private var isPlaying = false
+    @State private var playerReady = false
     @State private var user: User?
     @State private var gym: Gym?
     @StateObject private var userRepository = UserRepository()
@@ -167,13 +201,28 @@ struct WorkoutFeedCard: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Video Player
-                if let url = URL(string: workout.videoUrl) {
-                    VideoPlayer(player: player)
+                // Black background
+                Color.black
+                    .ignoresSafeArea()
+                
+                // Video Player (Custom View)
+                if let player = player, playerReady {
+                    CustomVideoPlayer(player: player)
                         .frame(width: geometry.size.width, height: geometry.size.height)
-                        .onTapGesture {
-                            togglePlayPause()
-                        }
+                } else {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                }
+                
+                // Pause Icon Overlay (show before gradient so it's visible)
+                if !isPlaying {
+                    Image(systemName: "pause.circle.fill")
+                        .font(.system(size: 80))
+                        .foregroundColor(.white.opacity(0.9))
+                        .shadow(radius: 10)
+                        .transition(.scale.combined(with: .opacity))
+                        .allowsHitTesting(false)
                 }
                 
                 // Gradient overlay for better text visibility
@@ -182,6 +231,7 @@ struct WorkoutFeedCard: View {
                     startPoint: .center,
                     endPoint: .bottom
                 )
+                .allowsHitTesting(false)
                 
                 // Content Overlay
                 VStack {
@@ -223,47 +273,106 @@ struct WorkoutFeedCard: View {
                         
                         // Right side - Actions
                         actionButtons
+                            .allowsHitTesting(true)
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 32)
+                    .allowsHitTesting(false) // Allow taps to pass through except for buttons
                 }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                togglePlayPause()
             }
         }
         .onAppear {
+            print("🎬 Card appeared for workout: \(workout.id ?? "unknown")")
             setupPlayer()
             Task {
                 await loadUserAndGym()
             }
         }
         .onDisappear {
-            player?.pause()
+            print("👋 Card disappeared for workout: \(workout.id ?? "unknown")")
+            cleanupPlayer()
         }
     }
     
     private func setupPlayer() {
-        guard let url = URL(string: workout.videoUrl) else { return }
-        player = AVPlayer(url: url)
-        player?.play()
-        isPlaying = true
+        // Clean up any existing player first
+        if player != nil {
+            cleanupPlayer()
+        }
+        
+        guard let url = URL(string: workout.videoUrl) else {
+            print("❌ Invalid video URL: \(workout.videoUrl)")
+            return
+        }
+        
+        print("🎥 Setting up player for URL: \(url)")
+        
+        // Create new player
+        let newPlayer = AVPlayer(url: url)
+        newPlayer.actionAtItemEnd = .none
+        
+        // Set player immediately
+        self.player = newPlayer
+        
+        // Wait for player to be ready and start playing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.playerReady = true
+            newPlayer.play()
+            self.isPlaying = true
+            print("▶️ Player started playing, rate: \(newPlayer.rate)")
+        }
         
         // Loop video
         NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
-            object: player?.currentItem,
+            object: newPlayer.currentItem,
             queue: .main
         ) { _ in
-            player?.seek(to: .zero)
-            player?.play()
+            print("🔄 Video ended, looping...")
+            newPlayer.seek(to: .zero)
+            if self.isPlaying {
+                newPlayer.play()
+            }
         }
     }
     
+    private func cleanupPlayer() {
+        print("🧹 Cleaning up player")
+        
+        // Remove notification observers
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: player?.currentItem)
+        
+        // Stop and clear player
+        player?.pause()
+        player?.replaceCurrentItem(with: nil)
+        player = nil
+        playerReady = false
+        isPlaying = false
+    }
+    
     private func togglePlayPause() {
-        if isPlaying {
-            player?.pause()
-        } else {
-            player?.play()
+        guard let player = player else { 
+            print("⚠️ No player to toggle")
+            return 
         }
-        isPlaying.toggle()
+        
+        print("🔄 Toggle called. Current state - isPlaying: \(isPlaying), player.rate: \(player.rate)")
+        
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if isPlaying {
+                player.pause()
+                isPlaying = false
+                print("⏸️ Video paused. New rate: \(player.rate)")
+            } else {
+                player.play()
+                isPlaying = true
+                print("▶️ Video playing. New rate: \(player.rate)")
+            }
+        }
     }
     
     private func handleVote(_ voteType: VoteType) async {
