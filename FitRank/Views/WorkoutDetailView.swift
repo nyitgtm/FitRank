@@ -5,10 +5,12 @@ struct WorkoutDetailView: View {
     @StateObject private var gymRepository = GymRepository()
     @StateObject private var teamRepository = TeamRepository()
     @StateObject private var userRepository = UserRepository()
+    @StateObject private var voteService = VoteService.shared
     let workout: Workout
     
     @State private var workoutUser: User?
     @State private var hasIncrementedView = false
+    @State private var voteCounts: (upvotes: Int, downvotes: Int) = (0, 0)
     
     private var gymName: String {
         if let gymId = workout.gymId,
@@ -49,6 +51,12 @@ struct WorkoutDetailView: View {
             
             // Increment view count
             await incrementView()
+            
+            // Load vote counts
+            if let workoutId = workout.id {
+                await voteService.fetchVoteCounts(workoutId: workoutId)
+                voteCounts = voteService.voteCounts[workoutId] ?? (0, 0)
+            }
         }
     }
     
@@ -170,14 +178,14 @@ struct WorkoutDetailView: View {
                 EngagementBox(
                     icon: "hand.thumbsup.fill",
                     label: "Upvotes",
-                    value: "—",
+                    value: "\(voteCounts.upvotes)",
                     color: .green
                 )
                 
                 EngagementBox(
                     icon: "hand.thumbsdown.fill",
                     label: "Downvotes",
-                    value: "—",
+                    value: "\(voteCounts.downvotes)",
                     color: .red
                 )
             }
