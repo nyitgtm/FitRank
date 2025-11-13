@@ -202,7 +202,8 @@ struct CommentRowView: View {
                                 try? await commentService.toggleLike(
                                     workoutID: workoutID,
                                     commentID: comment.id ?? "",
-                                    userID: userID
+                                    userID: userID,
+                                    isReply: false
                                 )
                                 await loadLikeStatus()
                             }
@@ -354,7 +355,9 @@ struct ReplyRowView: View {
                         try? await commentService.toggleLike(
                             workoutID: workoutID,
                             commentID: reply.id ?? "",
-                            userID: userID
+                            userID: userID,
+                            isReply: true,
+                            parentCommentID: reply.parentCommentID
                         )
                         await loadLikeStatus()
                     }
@@ -383,7 +386,13 @@ struct ReplyRowView: View {
     private func loadLikeStatus() async {
         guard let userID = Auth.auth().currentUser?.uid,
               let replyID = reply.id else { return }
-        await commentService.checkIfLiked(workoutID: workoutID, commentID: replyID, userID: userID)
+        await commentService.checkIfLiked(
+            workoutID: workoutID,
+            commentID: replyID,
+            userID: userID,
+            isReply: true,
+            parentCommentID: reply.parentCommentID
+        )
     }
     
     private func timeAgoString(from date: Date) -> String {
