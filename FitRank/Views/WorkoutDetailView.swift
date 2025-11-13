@@ -8,6 +8,7 @@ struct WorkoutDetailView: View {
     let workout: Workout
     
     @State private var workoutUser: User?
+    @State private var hasIncrementedView = false
     
     private var gymName: String {
         if let gymId = workout.gymId,
@@ -45,6 +46,9 @@ struct WorkoutDetailView: View {
             } catch {
                 print("Error fetching user: \(error)")
             }
+            
+            // Increment view count
+            await incrementView()
         }
     }
     
@@ -304,6 +308,22 @@ struct WorkoutDetailView: View {
         case .published: return .green
         case .pending: return .orange
         case .removed: return .red
+        }
+    }
+    
+    private func incrementView() async {
+        guard let workoutID = workout.id else { return }
+        
+        // Only increment once per view
+        guard !hasIncrementedView else {
+            print("⏭️ View already incremented for this workout detail")
+            return
+        }
+        
+        await FirebaseService.shared.incrementViewCount(workoutId: workoutID)
+        
+        await MainActor.run {
+            hasIncrementedView = true
         }
     }
 }
