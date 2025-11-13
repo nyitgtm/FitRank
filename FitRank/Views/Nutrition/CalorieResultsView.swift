@@ -9,6 +9,22 @@ struct CalorieResultsView: View {
     let calculation: CalorieCalculation
     let onDone: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedGoalType: GoalType = .cutting
+    @State private var showingSaveConfirmation = false
+    
+    enum GoalType: String, CaseIterable {
+        case cutting = "Cutting"
+        case maintenance = "Maintenance"
+        case bulking = "Bulking"
+        
+        func calories(from calculation: CalorieCalculation) -> Int {
+            switch self {
+            case .cutting: return calculation.cuttingCalories
+            case .maintenance: return calculation.maintenanceCalories
+            case .bulking: return calculation.bulkingCalories
+            }
+        }
+    }
     
     var body: some View {
         NavigationView {
@@ -184,14 +200,39 @@ struct CalorieResultsView: View {
     }
     
     private var actionButtonsSection: some View {
-        VStack(spacing: 12) {
-            Button(action: {
-                // TODO: Save to user profile
-                print("Saving calorie plan to profile...")
-            }) {
+        VStack(spacing: 16) {
+            // Goal Type Selector
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Select Goal to Save")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Picker("Goal Type", selection: $selectedGoalType) {
+                    ForEach(GoalType.allCases, id: \.self) { type in
+                        Text(type.rawValue).tag(type)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                
+                HStack {
+                    Text("Daily Goal:")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(selectedGoalType.calories(from: calculation)) calories")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                }
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+            
+            Button(action: saveToProfile) {
                 HStack {
                     Image(systemName: "square.and.arrow.down")
-                    Text("Save to My Profile")
+                    Text("Save to Meal Logger")
                 }
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity)
@@ -210,6 +251,21 @@ struct CalorieResultsView: View {
                     .foregroundColor(.blue)
             }
         }
+        .alert("Saved Successfully!", isPresented: $showingSaveConfirmation) {
+            Button("OK") {
+                onDone()
+                dismiss()
+            }
+        } message: {
+            Text("Your daily calorie goal of \(selectedGoalType.calories(from: calculation)) calories has been saved to your Meal Logger.")
+        }
+    }
+    
+    private func saveToProfile() {
+        let calorieGoal = selectedGoalType.calories(from: calculation)
+        UserDefaults.standard.set(calorieGoal, forKey: "calorieGoal")
+        UserDefaults.standard.synchronize()
+        showingSaveConfirmation = true
     }
 }
 
