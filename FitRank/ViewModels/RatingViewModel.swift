@@ -91,15 +91,12 @@ class RatingViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Rating Statistics
+    // MARK: - Rating Statistics (Legacy - use VoteService instead)
     
     func getRatingStats(for workout: Workout) -> (upvotes: Int, downvotes: Int, totalVotes: Int, formRating: Double) {
-        let upvotes = workout.upvotes
-        let downvotes = workout.downvotes
-        let totalVotes = upvotes + downvotes
-        let formRating = workout.formRating
-        
-        return (upvotes, downvotes, totalVotes, formRating)
+        // Note: Stats now tracked in votes subcollection
+        // This method is deprecated, use VoteService.shared instead
+        return (0, 0, 0, 0.0)
     }
     
     // MARK: - Error Handling

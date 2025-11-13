@@ -1,0 +1,265 @@
+import Foundation
+import FirebaseFirestore
+import FirebaseAuth
+
+class CommentService: ObservableObject {
+    static let shared = CommentService()
+    private let db = Firestore.firestore()
+    
+    @Published var comments: [String: [Comment]] = [:] // workoutID: [comments]
+    @Published var replies: [String: [Comment]] = [:] // commentID: [replies]
+    @Published var commentLikes: [String: Bool] = [:] // commentID: hasLiked
+    @Published var commentCounts: [String: Int] = [:] // workoutID: count
+    
+    private init() {}
+    
+    // MARK: - Fetch Comments
+    
+    func fetchComments(workoutID: String) async {
+        do {
+            print("📥 Fetching comments for workout: \(workoutID)")
+            
+            let snapshot = try await db.collection("workouts")
+                .document(workoutID)
+                .collection("comments")
+                .order(by: "timestamp", descending: true)
+                .getDocuments()
+            
+            print("📄 Found \(snapshot.documents.count) comments")
+            
+            let fetchedComments = snapshot.documents.compactMap { doc -> Comment? in
+                do {
+                    var comment = try doc.data(as: Comment.self)
+                    // Ensure the comment has its ID
+                    if comment.id == nil {
+                        comment.id = doc.documentID
+                    }
+                    print("📝 Comment: \(comment.content), ID: \(comment.id ?? "nil")")
+                    return comment
+                } catch {
+                    print("❌ Error decoding comment \(doc.documentID): \(error)")
+                    return nil
+                }
+            }
+            
+            await MainActor.run {
+                self.comments[workoutID] = fetchedComments
+                self.commentCounts[workoutID] = fetchedComments.count
+            }
+            
+            print("✅ Fetched \(fetchedComments.count) comments for workout \(workoutID)")
+        } catch {
+            print("❌ Error fetching comments: \(error)")
+        }
+    }
+    
+    func fetchReplies(workoutID: String, commentID: String) async {
+        do {
+            print("📥 Fetching replies for comment: \(commentID)")
+            
+            let snapshot = try await db.collection("workouts")
+                .document(workoutID)
+                .collection("comments")
+                .document(commentID)
+                .collection("replies")
+                .order(by: "timestamp", descending: false)
+                .getDocuments()
+            
+            print("📄 Found \(snapshot.documents.count) replies")
+            
+            let fetchedReplies = snapshot.documents.compactMap { doc -> Comment? in
+                do {
+                    var reply = try doc.data(as: Comment.self)
+                    if reply.id == nil {
+                        reply.id = doc.documentID
+                    }
+                    return reply
+                } catch {
+                    print("❌ Error decoding reply: \(error)")
+                    return nil
+                }
+            }
+            
+            await MainActor.run {
+                self.replies[commentID] = fetchedReplies
+            }
+            
+            print("✅ Fetched \(fetchedReplies.count) replies for comment \(commentID)")
+        } catch {
+            print("❌ Error fetching replies: \(error)")
+        }
+    }
+    
+    // MARK: - Add Comment/Reply
+    
+    func addComment(workoutID: String, userID: String, content: String, parentCommentID: String? = nil) async throws {
+        if let parentID = parentCommentID {
+            // This is a reply - add to replies subcollection
+            let reply = Comment(
+                userID: userID,
+                workoutID: workoutID,
+                content: content,
+                parentCommentID: parentID
+            )
+            
+            let replyRef = try db.collection("workouts")
+                .document(workoutID)
+                .collection("comments")
+                .document(parentID)
+                .collection("replies")
+                .addDocument(from: reply)
+            
+            // Increment parent's reply count
+            try await db.collection("workouts")
+                .document(workoutID)
+                .collection("comments")
+                .document(parentID)
+                .updateData(["replyCount": FieldValue.increment(Int64(1))])
+            
+            // Refresh replies
+            await fetchReplies(workoutID: workoutID, commentID: parentID)
+            
+            print("✅ Added reply: \(replyRef.documentID)")
+        } else {
+            // This is a top-level comment
+            let comment = Comment(
+                userID: userID,
+                workoutID: workoutID,
+                content: content
+            )
+            
+            let commentRef = try db.collection("workouts")
+                .document(workoutID)
+                .collection("comments")
+                .addDocument(from: comment)
+            
+            // Refresh comments
+            await fetchComments(workoutID: workoutID)
+            
+            print("✅ Added comment: \(commentRef.documentID)")
+        }
+    }
+    
+    // MARK: - Like/Unlike Comment
+    
+    func toggleLike(workoutID: String, commentID: String, userID: String, isReply: Bool = false, parentCommentID: String? = nil) async throws {
+        let commentRef: DocumentReference
+        let likeRef: DocumentReference
+        
+        if isReply, let parentID = parentCommentID {
+            // Like on a reply
+            commentRef = db.collection("workouts")
+                .document(workoutID)
+                .collection("comments")
+                .document(parentID)
+                .collection("replies")
+                .document(commentID)
+            
+            likeRef = commentRef.collection("likes").document(userID)
+        } else {
+            // Like on a top-level comment
+            commentRef = db.collection("workouts")
+                .document(workoutID)
+                .collection("comments")
+                .document(commentID)
+            
+            likeRef = commentRef.collection("likes").document(userID)
+        }
+        
+        let likeDoc = try await likeRef.getDocument()
+        
+        if likeDoc.exists {
+            // Unlike
+            try await likeRef.delete()
+            try await commentRef.updateData(["likes": FieldValue.increment(Int64(-1))])
+            
+            await MainActor.run {
+                self.commentLikes[commentID] = false
+            }
+            
+            print("👎 Unliked comment \(commentID)")
+        } else {
+            // Like
+            let like = CommentLike(userID: userID, commentID: commentID)
+            try likeRef.setData(from: like)
+            try await commentRef.updateData(["likes": FieldValue.increment(Int64(1))])
+            
+            await MainActor.run {
+                self.commentLikes[commentID] = true
+            }
+            
+            print("👍 Liked comment \(commentID)")
+        }
+    }
+    
+    // MARK: - Check if User Liked Comment
+    
+    func checkIfLiked(workoutID: String, commentID: String, userID: String, isReply: Bool = false, parentCommentID: String? = nil) async {
+        do {
+            let likeDoc: DocumentSnapshot
+            
+            if isReply, let parentID = parentCommentID {
+                likeDoc = try await db.collection("workouts")
+                    .document(workoutID)
+                    .collection("comments")
+                    .document(parentID)
+                    .collection("replies")
+                    .document(commentID)
+                    .collection("likes")
+                    .document(userID)
+                    .getDocument()
+            } else {
+                likeDoc = try await db.collection("workouts")
+                    .document(workoutID)
+                    .collection("comments")
+                    .document(commentID)
+                    .collection("likes")
+                    .document(userID)
+                    .getDocument()
+            }
+            
+            await MainActor.run {
+                self.commentLikes[commentID] = likeDoc.exists
+            }
+        } catch {
+            print("❌ Error checking like status: \(error)")
+        }
+    }
+    
+    // MARK: - Delete Comment
+    
+    func deleteComment(workoutID: String, commentID: String, isReply: Bool = false, parentCommentID: String?) async throws {
+        if isReply, let parentID = parentCommentID {
+            // Delete reply
+            try await db.collection("workouts")
+                .document(workoutID)
+                .collection("comments")
+                .document(parentID)
+                .collection("replies")
+                .document(commentID)
+                .delete()
+            
+            // Decrement parent's reply count
+            try await db.collection("workouts")
+                .document(workoutID)
+                .collection("comments")
+                .document(parentID)
+                .updateData(["replyCount": FieldValue.increment(Int64(-1))])
+            
+            // Refresh replies
+            await fetchReplies(workoutID: workoutID, commentID: parentID)
+        } else {
+            // Delete top-level comment (and all its replies)
+            try await db.collection("workouts")
+                .document(workoutID)
+                .collection("comments")
+                .document(commentID)
+                .delete()
+            
+            // Refresh comments
+            await fetchComments(workoutID: workoutID)
+        }
+        
+        print("🗑️ Deleted comment \(commentID)")
+    }
+}

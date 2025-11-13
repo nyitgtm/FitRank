@@ -103,14 +103,43 @@ class FirebaseService: ObservableObject {
     func deleteWorkout(workoutId: String) async throws {
         try await db.collection("workouts").document(workoutId).delete()
     }
+    
+    func getPublishedWorkouts(limit: Int = 20) async throws -> [Workout] {
+        let snapshot = try await db.collection("workouts")
+            .whereField("status", isEqualTo: "published")
+            .order(by: "createdAt", descending: true)
+            .limit(to: limit)
+            .getDocuments()
+        return try snapshot.documents.compactMap { try $0.data(as: Workout.self) }
+    }
+    
+    func getAllWorkouts(limit: Int = 50) async throws -> [Workout] {
+        let snapshot = try await db.collection("workouts")
+            .order(by: "createdAt", descending: true)
+            .limit(to: limit)
+            .getDocuments()
+        return try snapshot.documents.compactMap { try $0.data(as: Workout.self) }
+    }
+    
+    // MARK: - View Tracking
+    
+    func incrementViewCount(workoutId: String) async {
+        do {
+            try await db.collection("workouts")
+                .document(workoutId)
+                .updateData(["views": FieldValue.increment(Int64(1))])
+            print("👁️ Incremented view count for workout \(workoutId)")
+        } catch {
+            print("❌ Error incrementing view count: \(error)")
+        }
+    }
 
-    // MARK: - Rating Operations
+    // MARK: - Rating Operations (Legacy - now use VoteService for voting)
 
     func createRating(_ rating: Rating) async throws {
         let existingRating = try await getUserRating(userId: rating.userID, workoutId: rating.workoutId)
         if existingRating != nil { throw FirebaseError.duplicateRating }
         try await db.collection("ratings").addDocument(from: rating)
-        try await updateWorkoutVotes(workoutId: rating.workoutId, ratingValue: rating.value)
     }
 
     func getUserRating(userId: String, workoutId: String) async throws -> Rating? {
@@ -119,14 +148,6 @@ class FirebaseService: ObservableObject {
             .whereField("workoutId", isEqualTo: workoutId)
             .getDocuments()
         return try snapshot.documents.first?.data(as: Rating.self)
-    }
-
-    private func updateWorkoutVotes(workoutId: String, ratingValue: RatingValue) async throws {
-        let workoutRef = db.collection("workouts").document(workoutId)
-        let workoutDoc = try await workoutRef.getDocument()
-        guard var workout = try? workoutDoc.data(as: Workout.self) else { throw FirebaseError.decodingError }
-        if ratingValue == .upvote { workout.upvotes += 1 } else { workout.downvotes += 1 }
-        try await workoutRef.setData(from: workout)
     }
 
     // MARK: - Global Comment Operations (non-community)

@@ -1,8 +1,21 @@
 import SwiftUI
 
+struct VoteCounts: Equatable {
+    let upvotes: Int
+    let downvotes: Int
+}
+
 struct CompactWorkoutCard: View {
     let workout: Workout
     let onTap: () -> Void
+    
+    @StateObject private var voteService = VoteService.shared
+    @State private var voteCounts: VoteCounts = VoteCounts(upvotes: 0, downvotes: 0)
+    
+    private var observedVoteCounts: VoteCounts? {
+        guard let counts = voteService.voteCounts[workout.id ?? ""] else { return nil }
+        return VoteCounts(upvotes: counts.upvotes, downvotes: counts.downvotes)
+    }
     
     var body: some View {
         Button(action: onTap) {
@@ -31,11 +44,11 @@ struct CompactWorkoutCard: View {
             
             Divider()
             
-            // Stats row
+            // Stats row (now with actual vote data)
             HStack(spacing: 16) {
                 StatPill(icon: "eye.fill", value: "\(workout.views)", color: .secondary)
-                StatPill(icon: "hand.thumbsup.fill", value: "\(workout.upvotes)", color: .green)
-                StatPill(icon: "hand.thumbsdown.fill", value: "\(workout.downvotes)", color: .red)
+                StatPill(icon: "hand.thumbsup.fill", value: "\(voteCounts.upvotes)", color: .green)
+                StatPill(icon: "hand.thumbsdown.fill", value: "\(voteCounts.downvotes)", color: .red)
             }
             
             Spacer() // is this too much space, i think it looks fine lwk
@@ -73,6 +86,21 @@ struct CompactWorkoutCard: View {
         )
         }
         .buttonStyle(PlainButtonStyle())
+        .task {
+            // Load vote counts when card appears
+            if let workoutId = workout.id {
+                await voteService.fetchVoteCounts(workoutId: workoutId)
+                if let counts = voteService.voteCounts[workoutId] {
+                    voteCounts = VoteCounts(upvotes: counts.upvotes, downvotes: counts.downvotes)
+                }
+            }
+        }
+        .onChange(of: observedVoteCounts) { _, newValue in
+            // Update when vote counts change
+            if let newValue = newValue {
+                voteCounts = newValue
+            }
+        }
     }
     
     private func statusColor(_ status: WorkoutStatus) -> Color {

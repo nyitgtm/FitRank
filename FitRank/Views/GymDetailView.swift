@@ -236,7 +236,11 @@ struct GymDetailView: View {
                         }
                         
                         HStack {
-                            Text("Views: \(workout.views) • ↑\(workout.upvotes) ↓\(workout.downvotes)")
+                            Text("Views: \(workout.views)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            // Note: Votes now in subcollection
+                            Text("• Votes: —")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                             

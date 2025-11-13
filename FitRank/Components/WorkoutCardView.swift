@@ -146,7 +146,7 @@ struct WorkoutCardView: View {
                     
                     Spacer()
                     
-                    // Stats
+                    // Stats (Note: votes now in subcollection)
                     VStack(alignment: .trailing, spacing: 4) {
                         HStack(spacing: 8) {
                             Image(systemName: "eye.fill")
@@ -159,7 +159,7 @@ struct WorkoutCardView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "hand.thumbsup.fill")
                                 .foregroundColor(.green)
-                            Text("\(workout.upvotes)")
+                            Text("—")
                                 .font(.caption)
                                 .foregroundColor(.green)
                         }
@@ -167,7 +167,7 @@ struct WorkoutCardView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "hand.thumbsdown.fill")
                                 .foregroundColor(.red)
-                            Text("\(workout.downvotes)")
+                            Text("—")
                                 .font(.caption)
                                 .foregroundColor(.red)
                         }
