@@ -123,6 +123,7 @@ struct WorkoutFeedCard: View {
     @State private var playerReady = false
     @State private var user: User?
     @State private var gym: Gym?
+    @State private var isLoadingGym = true
     @StateObject private var userRepository = UserRepository()
     @StateObject private var gymRepository = GymRepository()
     
@@ -262,8 +263,16 @@ struct WorkoutFeedCard: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "mappin.circle.fill")
                                         .font(.caption)
-                                    Text(gym?.name ?? "Loading gym...")
-                                        .font(.caption)
+                                    if isLoadingGym {
+                                        Text("Loading gym...")
+                                            .font(.caption)
+                                    } else if let gymName = gym?.name {
+                                        Text(gymName)
+                                            .font(.caption)
+                                    } else {
+                                        Text("No gym info")
+                                            .font(.caption)
+                                    }
                                 }
                                 .foregroundColor(.white.opacity(0.8))
                             }
@@ -393,15 +402,55 @@ struct WorkoutFeedCard: View {
     private func loadUserAndGym() async {
         // Load user
         do {
-            user = try await userRepository.getUser(uid: workout.userId)
+            let loadedUser = try await userRepository.getUser(uid: workout.userId)
+            await MainActor.run {
+                self.user = loadedUser
+            }
+            print("✅ Loaded user: \(loadedUser?.name ?? "unknown")")
         } catch {
-            print("Error loading user: \(error)")
+            print("❌ Error loading user: \(error)")
         }
         
         // Load gym if exists
         if let gymId = workout.gymId {
-            await gymRepository.fetchGyms()
-            gym = gymRepository.gyms.first(where: { $0.id == gymId })
+            print("🏋️ Loading gym with ID: \(gymId)")
+            
+            await MainActor.run {
+                self.isLoadingGym = true
+            }
+            
+            // Fetch gyms if not already loaded
+            if gymRepository.gyms.isEmpty {
+                print("📥 Gyms not loaded yet, fetching...")
+                gymRepository.fetchGyms()
+                
+                // Wait for gyms to load (max 3 seconds)
+                for i in 0..<30 {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                    if !gymRepository.gyms.isEmpty {
+                        print("✅ Gyms loaded after \(Double(i+1) * 0.1) seconds")
+                        break
+                    }
+                }
+            }
+            
+            let foundGym = gymRepository.gyms.first(where: { $0.id == gymId })
+            
+            await MainActor.run {
+                self.gym = foundGym
+                self.isLoadingGym = false
+                
+                if let gymName = foundGym?.name {
+                    print("✅ Loaded gym: \(gymName)")
+                } else {
+                    print("⚠️ Gym not found with ID: \(gymId)")
+                    print("⚠️ Total gyms available: \(gymRepository.gyms.count)")
+                }
+            }
+        } else {
+            await MainActor.run {
+                self.isLoadingGym = false
+            }
         }
     }
 }
