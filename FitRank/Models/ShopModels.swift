@@ -7,10 +7,14 @@ import Foundation
 import SwiftUI
 
 enum ItemRarity: String, Codable {
-    case common = "Common"
-    case rare = "Rare"
-    case epic = "Epic"
-    case legendary = "Legendary"
+    case common = "common"
+    case rare = "rare"
+    case epic = "epic"
+    case legendary = "legendary"
+    
+    var displayName: String {
+        rawValue.capitalized
+    }
     
     var color: Color {
         switch self {
@@ -32,33 +36,101 @@ enum ItemRarity: String, Codable {
 }
 
 enum ShopItemType: String, Codable {
-    case theme = "Theme"
-    case badge = "Badge"
-    case merchandise = "Merchandise"
-    case title = "Title"
+    case theme = "theme"
+    case badge = "badge"
+    case merchandise = "merchandise"
+    case title = "title"
+    
+    var displayName: String {
+        switch self {
+        case .theme: return "Theme"
+        case .badge: return "Badge"
+        case .merchandise: return "Merch"
+        case .title: return "Title"
+        }
+    }
 }
 
 struct ShopItem: Identifiable, Codable {
     let id: String
     let name: String
     let description: String
-    let price: Int // in tokens
+    let price: Int
     let rarity: ItemRarity
-    let type: ShopItemType
-    let iconName: String
-    let previewImageName: String?
-    let isNew: Bool
-    let expiresAt: Date? // For limited time items
-    var purchaseCount: Int // Track total purchases from all users
+    let category: ShopItemType
+    let imageUrl: String?
+    let isActive: Bool
+    let isFeatured: Bool
+    let createdAt: Date?
+    let availableUntil: Date?
+    var purchaseCount: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case description
+        case price
+        case rarity
+        case category
+        case imageUrl
+        case isActive
+        case isFeatured
+        case createdAt
+        case availableUntil
+        case purchaseCount
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Use document ID if available, otherwise generate one
+        id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        name = try container.decode(String.self, forKey: .name)
+        description = try container.decode(String.self, forKey: .description)
+        price = try container.decode(Int.self, forKey: .price)
+        rarity = try container.decode(ItemRarity.self, forKey: .rarity)
+        category = try container.decode(ShopItemType.self, forKey: .category)
+        imageUrl = try? container.decode(String.self, forKey: .imageUrl)
+        isActive = (try? container.decode(Bool.self, forKey: .isActive)) ?? true
+        isFeatured = (try? container.decode(Bool.self, forKey: .isFeatured)) ?? false
+        createdAt = try? container.decode(Date.self, forKey: .createdAt)
+        availableUntil = try? container.decode(Date.self, forKey: .availableUntil)
+        purchaseCount = (try? container.decode(Int.self, forKey: .purchaseCount)) ?? 0
+    }
+    
+    init(id: String, name: String, description: String, price: Int, rarity: ItemRarity, category: ShopItemType, imageUrl: String? = nil, isActive: Bool = true, isFeatured: Bool = false, createdAt: Date? = nil, availableUntil: Date? = nil, purchaseCount: Int = 0) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.price = price
+        self.rarity = rarity
+        self.category = category
+        self.imageUrl = imageUrl
+        self.isActive = isActive
+        self.isFeatured = isFeatured
+        self.createdAt = createdAt
+        self.availableUntil = availableUntil
+        self.purchaseCount = purchaseCount
+    }
+    
+    var type: ShopItemType {
+        category
+    }
+    
+    var isNew: Bool {
+        guard let createdAt = createdAt else { return false }
+        let daysSinceCreation = Calendar.current.dateComponents([.day], from: createdAt, to: Date()).day ?? 0
+        return daysSinceCreation <= 7 // Items are "new" for 7 days
+    }
     
     var isExpired: Bool {
-        guard let expiresAt = expiresAt else { return false }
-        return Date() > expiresAt
+        guard let availableUntil = availableUntil else { return false }
+        return Date() > availableUntil
     }
     
     var timeRemaining: String? {
-        guard let expiresAt = expiresAt else { return nil }
-        let interval = expiresAt.timeIntervalSince(Date())
+        guard let availableUntil = availableUntil else { return nil }
+        let interval = availableUntil.timeIntervalSince(Date())
         if interval <= 0 { return "Expired" }
         
         let hours = Int(interval) / 3600
@@ -70,6 +142,56 @@ struct ShopItem: Identifiable, Codable {
             return "\(minutes)m"
         }
     }
+    
+    var iconName: String {
+        // Return SF Symbol based on category and name
+        switch category {
+        case .theme:
+            if name.lowercased().contains("dark") {
+                return "moon.stars.fill"
+            } else if name.lowercased().contains("ocean") {
+                return "water.waves"
+            } else if name.lowercased().contains("sunset") {
+                return "sunset.fill"
+            } else if name.lowercased().contains("forest") {
+                return "leaf.fill"
+            } else {
+                return "paintbrush.fill"
+            }
+        case .badge:
+            if name.lowercased().contains("fire") {
+                return "flame.fill"
+            } else if name.lowercased().contains("lightning") {
+                return "bolt.fill"
+            } else if name.lowercased().contains("diamond") {
+                return "diamond.fill"
+            } else if name.lowercased().contains("star") {
+                return "star.fill"
+            } else {
+                return "seal.fill"
+            }
+        case .merchandise:
+            if name.lowercased().contains("shirt") || name.lowercased().contains("tshirt") {
+                return "tshirt.fill"
+            } else if name.lowercased().contains("hoodie") {
+                return "rectangle.fill"
+            } else if name.lowercased().contains("bottle") {
+                return "waterbottle.fill"
+            } else if name.lowercased().contains("towel") {
+                return "rectangle.split.3x1.fill"
+            } else {
+                return "bag.fill"
+            }
+        case .title:
+            if name.lowercased().contains("beast") || name.lowercased().contains("champion") {
+                return "crown.fill"
+            } else if name.lowercased().contains("warrior") {
+                return "shield.fill"
+            } else {
+                return "person.fill"
+            }
+        }
+    }
 }
 
 struct UserInventory: Codable {
@@ -78,218 +200,4 @@ struct UserInventory: Codable {
     var equippedThemeId: String?
     var equippedBadgeId: String?
     var equippedTitleId: String?
-}
-
-// Shop items organized by category
-extension ShopItem {
-    static let themes: [ShopItem] = [
-        ShopItem(
-            id: "theme_dark_titan",
-            name: "Dark Titan",
-            description: "Sleek dark theme with neon accents",
-            price: 500,
-            rarity: .legendary,
-            type: .theme,
-            iconName: "moon.stars.fill",
-            previewImageName: nil,
-            isNew: true,
-            expiresAt: Date().addingTimeInterval(86400 * 7), // 7 days
-            purchaseCount: 0
-        ),
-        ShopItem(
-            id: "theme_ocean",
-            name: "Ocean Breeze",
-            description: "Calm blue gradient theme",
-            price: 300,
-            rarity: .epic,
-            type: .theme,
-            iconName: "water.waves",
-            previewImageName: nil,
-            isNew: false,
-            expiresAt: nil,
-            purchaseCount: 0
-        ),
-        ShopItem(
-            id: "theme_sunset",
-            name: "Sunset Warrior",
-            description: "Warm orange and pink gradients",
-            price: 250,
-            rarity: .rare,
-            type: .theme,
-            iconName: "sunset.fill",
-            previewImageName: nil,
-            isNew: false,
-            expiresAt: nil,
-            purchaseCount: 0
-        ),
-        ShopItem(
-            id: "theme_forest",
-            name: "Forest Green",
-            description: "Natural green theme",
-            price: 200,
-            rarity: .rare,
-            type: .theme,
-            iconName: "leaf.fill",
-            previewImageName: nil,
-            isNew: false,
-            expiresAt: nil,
-            purchaseCount: 0
-        )
-    ]
-    
-    static let merchandise: [ShopItem] = [
-        ShopItem(
-            id: "merch_tshirt",
-            name: "FitRank T-Shirt",
-            description: "Premium quality workout tee",
-            price: 800,
-            rarity: .epic,
-            type: .merchandise,
-            iconName: "tshirt.fill",
-            previewImageName: nil,
-            isNew: true,
-            expiresAt: nil,
-            purchaseCount: 0
-        ),
-        ShopItem(
-            id: "merch_hoodie",
-            name: "FitRank Hoodie",
-            description: "Comfortable hoodie for the gym",
-            price: 1200,
-            rarity: .legendary,
-            type: .merchandise,
-            iconName: "rectangle.fill",
-            previewImageName: nil,
-            isNew: true,
-            expiresAt: nil,
-            purchaseCount: 0
-        ),
-        ShopItem(
-            id: "merch_bottle",
-            name: "Water Bottle",
-            description: "Stay hydrated in style",
-            price: 400,
-            rarity: .rare,
-            type: .merchandise,
-            iconName: "waterbottle.fill",
-            previewImageName: nil,
-            isNew: false,
-            expiresAt: nil,
-            purchaseCount: 0
-        ),
-        ShopItem(
-            id: "merch_towel",
-            name: "Gym Towel",
-            description: "Microfiber workout towel",
-            price: 300,
-            rarity: .rare,
-            type: .merchandise,
-            iconName: "rectangle.split.3x1.fill",
-            previewImageName: nil,
-            isNew: false,
-            expiresAt: nil,
-            purchaseCount: 0
-        )
-    ]
-    
-    static let badges: [ShopItem] = [
-        ShopItem(
-            id: "badge_fire",
-            name: "Fire Badge",
-            description: "Show your intensity",
-            price: 150,
-            rarity: .rare,
-            type: .badge,
-            iconName: "flame.fill",
-            previewImageName: nil,
-            isNew: false,
-            expiresAt: nil,
-            purchaseCount: 0
-        ),
-        ShopItem(
-            id: "badge_lightning",
-            name: "Lightning Strike",
-            description: "Speed and power combined",
-            price: 200,
-            rarity: .epic,
-            type: .badge,
-            iconName: "bolt.fill",
-            previewImageName: nil,
-            isNew: true,
-            expiresAt: Date().addingTimeInterval(86400 * 3), // 3 days
-            purchaseCount: 0
-        ),
-        ShopItem(
-            id: "badge_diamond",
-            name: "Diamond Badge",
-            description: "Unbreakable determination",
-            price: 350,
-            rarity: .legendary,
-            type: .badge,
-            iconName: "diamond.fill",
-            previewImageName: nil,
-            isNew: false,
-            expiresAt: nil,
-            purchaseCount: 0
-        ),
-        ShopItem(
-            id: "badge_star",
-            name: "Rising Star",
-            description: "For the up-and-comers",
-            price: 100,
-            rarity: .common,
-            type: .badge,
-            iconName: "star.fill",
-            previewImageName: nil,
-            isNew: false,
-            expiresAt: nil,
-            purchaseCount: 0
-        )
-    ]
-    
-    static let titles: [ShopItem] = [
-        ShopItem(
-            id: "title_beast",
-            name: "Beast Mode",
-            description: "Legendary title for champions",
-            price: 400,
-            rarity: .legendary,
-            type: .title,
-            iconName: "crown.fill",
-            previewImageName: nil,
-            isNew: false,
-            expiresAt: nil,
-            purchaseCount: 0
-        ),
-        ShopItem(
-            id: "title_warrior",
-            name: "Gym Warrior",
-            description: "For the dedicated",
-            price: 250,
-            rarity: .epic,
-            type: .title,
-            iconName: "shield.fill",
-            previewImageName: nil,
-            isNew: false,
-            expiresAt: nil,
-            purchaseCount: 0
-        ),
-        ShopItem(
-            id: "title_rookie",
-            name: "Rookie",
-            description: "Just getting started",
-            price: 50,
-            rarity: .common,
-            type: .title,
-            iconName: "person.fill",
-            previewImageName: nil,
-            isNew: false,
-            expiresAt: nil,
-            purchaseCount: 0
-        )
-    ]
-    
-    static var allItems: [ShopItem] {
-        themes + merchandise + badges + titles
-    }
 }

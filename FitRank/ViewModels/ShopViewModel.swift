@@ -60,38 +60,76 @@ class ShopViewModel: ObservableObject {
         do {
             let snapshot = try await db.collection("shopItems").getDocuments()
             
-            if snapshot.documents.isEmpty {
-                // Initialize shop items in Firestore
-                await initializeShopItems()
-            } else {
-                // Load from Firestore
-                shopItems = snapshot.documents.compactMap { doc -> ShopItem? in
-                    try? doc.data(as: ShopItem.self)
+            var items: [ShopItem] = []
+            
+            for document in snapshot.documents {
+                let data = document.data()
+                
+                // Manually create item with document ID
+                guard let name = data["name"] as? String,
+                      let description = data["description"] as? String,
+                      let price = data["price"] as? Int,
+                      let rarityString = data["rarity"] as? String,
+                      let categoryString = data["category"] as? String,
+                      let rarity = ItemRarity(rawValue: rarityString),
+                      let category = ShopItemType(rawValue: categoryString) else {
+                    print("⚠️ Skipping item \(document.documentID) - missing required fields")
+                    continue
+                }
+                
+                let isActive = data["isActive"] as? Bool ?? true
+                let isFeatured = data["isFeatured"] as? Bool ?? false
+                let purchaseCount = data["purchaseCount"] as? Int ?? 0
+                let imageUrl = data["imageUrl"] as? String
+                
+                // Handle timestamps
+                let createdAt = (data["createdAt"] as? Timestamp)?.dateValue()
+                let availableUntil = (data["availableUntil"] as? Timestamp)?.dateValue()
+                
+                let item = ShopItem(
+                    id: document.documentID, // Use Firestore document ID
+                    name: name,
+                    description: description,
+                    price: price,
+                    rarity: rarity,
+                    category: category,
+                    imageUrl: imageUrl,
+                    isActive: isActive,
+                    isFeatured: isFeatured,
+                    createdAt: createdAt,
+                    availableUntil: availableUntil,
+                    purchaseCount: purchaseCount
+                )
+                
+                // Only add active items
+                if item.isActive && !item.isExpired {
+                    items.append(item)
+                    print("✅ Loaded item: \(item.name) (ID: \(document.documentID))")
                 }
             }
-        } catch {
-            print("Failed to load shop items: \(error)")
-            shopItems = ShopItem.allItems // Fallback to local items
-        }
-    }
-    
-    private func initializeShopItems() async {
-        let allItems = ShopItem.allItems
-        
-        for item in allItems {
-            do {
-                try db.collection("shopItems").document(item.id).setData(from: item)
-            } catch {
-                print("Failed to initialize item \(item.id): \(error)")
+            
+            shopItems = items.sorted { item1, item2 in
+                // Sort by: featured first, then by rarity, then by price
+                if item1.isFeatured != item2.isFeatured {
+                    return item1.isFeatured
+                }
+                if item1.rarity != item2.rarity {
+                    return item1.rarity.rawValue < item2.rarity.rawValue
+                }
+                return item1.price > item2.price
             }
+            
+            print("✅ Loaded \(shopItems.count) shop items total")
+            
+        } catch {
+            print("❌ Failed to load shop items: \(error)")
         }
-        
-        shopItems = allItems
     }
     
     private func loadLocalPurchases() {
         if let savedIds = UserDefaults.standard.array(forKey: userDefaultsKey) as? [String] {
             inventory.ownedItemIds = Set(savedIds)
+            print("✅ Loaded \(savedIds.count) local purchases")
         }
     }
     
@@ -100,6 +138,7 @@ class ShopViewModel: ObservableObject {
         if !purchases.contains(itemId) {
             purchases.append(itemId)
             UserDefaults.standard.set(purchases, forKey: userDefaultsKey)
+            print("💾 Saved purchase locally: \(itemId)")
         }
     }
     
@@ -125,6 +164,8 @@ class ShopViewModel: ObservableObject {
             return
         }
         
+        print("🛒 Attempting to purchase: \(item.name) (ID: \(item.id)) for \(item.price) tokens")
+        
         Task {
             do {
                 // Create a batch write
@@ -136,11 +177,18 @@ class ShopViewModel: ObservableObject {
                     "tokens": FieldValue.increment(Int64(-item.price))
                 ], forDocument: userRef)
                 
-                // 2. Increment purchase count for item
+                // 2. Increment purchase count for item (only if document exists)
                 let itemRef = db.collection("shopItems").document(item.id)
-                batch.updateData([
-                    "purchaseCount": FieldValue.increment(Int64(1))
-                ], forDocument: itemRef)
+                
+                // Check if document exists first
+                let itemDoc = try await itemRef.getDocument()
+                if itemDoc.exists {
+                    batch.updateData([
+                        "purchaseCount": FieldValue.increment(Int64(1))
+                    ], forDocument: itemRef)
+                } else {
+                    print("⚠️ Shop item document doesn't exist: \(item.id)")
+                }
                 
                 // 3. Record purchase in user's purchases subcollection
                 let purchaseRef = db.collection("users").document(userId).collection("purchases").document(item.id)
@@ -149,7 +197,7 @@ class ShopViewModel: ObservableObject {
                     "itemName": item.name,
                     "price": item.price,
                     "purchasedAt": FieldValue.serverTimestamp(),
-                    "type": item.type.rawValue
+                    "category": item.category.rawValue
                 ], forDocument: purchaseRef)
                 
                 // Commit batch
@@ -163,7 +211,7 @@ class ShopViewModel: ObservableObject {
                 saveLocalPurchase(item.id)
                 
                 // Auto-equip if it's the first of its type
-                switch item.type {
+                switch item.category {
                 case .theme:
                     if inventory.equippedThemeId == nil {
                         await equipItem(item)
@@ -188,8 +236,11 @@ class ShopViewModel: ObservableObject {
                 lastPurchasedItem = item
                 showingPurchaseSuccess = true
                 
+                print("✅ Successfully purchased \(item.name)")
+                
             } catch {
                 errorMessage = "Purchase failed: \(error.localizedDescription)"
+                print("❌ Purchase failed: \(error)")
             }
         }
     }
@@ -198,22 +249,25 @@ class ShopViewModel: ObservableObject {
         guard inventory.ownedItemIds.contains(item.id) else { return }
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
-        switch item.type {
+        switch item.category {
         case .theme:
             inventory.equippedThemeId = item.id
             try? await db.collection("users").document(userId).updateData([
                 "equippedThemeId": item.id
             ])
+            print("✅ Equipped theme: \(item.name)")
         case .badge:
             inventory.equippedBadgeId = item.id
             try? await db.collection("users").document(userId).updateData([
                 "equippedBadgeId": item.id
             ])
+            print("✅ Equipped badge: \(item.name)")
         case .title:
             inventory.equippedTitleId = item.id
             try? await db.collection("users").document(userId).updateData([
                 "equippedTitleId": item.id
             ])
+            print("✅ Equipped title: \(item.name)")
         case .merchandise:
             break
         }
