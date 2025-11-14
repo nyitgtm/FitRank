@@ -12,6 +12,14 @@ enum ClaimType {
     case likes
 }
 
+enum ShopCategory: String, CaseIterable {
+    case all = "All"
+    case themes = "Themes"
+    case merchandise = "Merch"
+    case badges = "Badges"
+    case titles = "Titles"
+}
+
 struct ItemShopView: View {
     @StateObject private var viewModel = ShopViewModel()
     @Environment(\.dismiss) private var dismiss
@@ -21,8 +29,24 @@ struct ItemShopView: View {
     @State private var showClaimSuccess = false
     @State private var claimedAmount = 0
     @State private var currentTime = Date()
+    @State private var selectedCategory: ShopCategory = .all
     
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
+    var filteredItems: [ShopItem] {
+        switch selectedCategory {
+        case .all:
+            return viewModel.shopItems
+        case .themes:
+            return viewModel.shopItems.filter { $0.type == .theme }
+        case .merchandise:
+            return viewModel.shopItems.filter { $0.type == .merchandise }
+        case .badges:
+            return viewModel.shopItems.filter { $0.type == .badge }
+        case .titles:
+            return viewModel.shopItems.filter { $0.type == .title }
+        }
+    }
     
     var body: some View {
         NavigationView {
@@ -56,8 +80,26 @@ struct ItemShopView: View {
                         )
                         .padding(.horizontal)
                         
+                        // Category Picker
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(ShopCategory.allCases, id: \.self) { category in
+                                    CategoryButton(
+                                        category: category,
+                                        isSelected: selectedCategory == category
+                                    ) {
+                                        withAnimation {
+                                            selectedCategory = category
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                        .padding(.top, 8)
+                        
                         // Shop items grid
-                        Text("Shop Items")
+                        Text("\(selectedCategory.rawValue)")
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
@@ -65,25 +107,40 @@ struct ItemShopView: View {
                             .padding(.horizontal)
                             .padding(.top, 8)
                         
-                        LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 16),
-                            GridItem(.flexible(), spacing: 16)
-                        ], spacing: 16) {
-                            ForEach(viewModel.shopItems) { item in
-                                ShopItemCard(
-                                    item: item,
-                                    isOwned: viewModel.inventory.ownedItemIds.contains(item.id),
-                                    isEquipped: isItemEquipped(item)
-                                ) {
-                                    if viewModel.inventory.ownedItemIds.contains(item.id) {
-                                        viewModel.equipItem(item)
-                                    } else {
-                                        viewModel.purchaseItem(item)
+                        if filteredItems.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "cart")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.white.opacity(0.3))
+                                Text("No items in this category")
+                                    .font(.subheadline)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 40)
+                        } else {
+                            LazyVGrid(columns: [
+                                GridItem(.flexible(), spacing: 16),
+                                GridItem(.flexible(), spacing: 16)
+                            ], spacing: 16) {
+                                ForEach(filteredItems) { item in
+                                    ShopItemCard(
+                                        item: item,
+                                        isOwned: viewModel.inventory.ownedItemIds.contains(item.id),
+                                        isEquipped: isItemEquipped(item)
+                                    ) {
+                                        if viewModel.inventory.ownedItemIds.contains(item.id) {
+                                            Task {
+                                                await viewModel.equipItem(item)
+                                            }
+                                        } else {
+                                            viewModel.purchaseItem(item)
+                                        }
                                     }
                                 }
                             }
+                            .padding(.horizontal)
                         }
-                        .padding(.horizontal)
                     }
                     .padding(.vertical)
                 }
@@ -199,8 +256,40 @@ struct ItemShopView: View {
             return viewModel.inventory.equippedBadgeId == item.id
         case .title:
             return viewModel.inventory.equippedTitleId == item.id
-        case .effect:
+        case .merchandise:
             return false
+        }
+    }
+}
+
+// MARK: - Category Button
+struct CategoryButton: View {
+    let category: ShopCategory
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(category.rawValue)
+                .font(.subheadline)
+                .fontWeight(isSelected ? .bold : .medium)
+                .foregroundColor(isSelected ? .black : .white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    isSelected ?
+                    LinearGradient(
+                        colors: [.yellow, .orange],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ) :
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.2), Color.white.opacity(0.1)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(20)
         }
     }
 }
@@ -341,7 +430,6 @@ struct DailyTaskRow: View {
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
                     
-                    // TIMER RIGHT UNDER TITLE
                     if isClaimed && timeRemaining > 0 {
                         Text("⏱️ \(formattedTimeRemaining)")
                             .font(.caption)
@@ -432,11 +520,9 @@ struct DailyTaskRow: View {
             // Progress Bar
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    // Background
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color.white.opacity(0.2))
                     
-                    // Progress
                     RoundedRectangle(cornerRadius: 4)
                         .fill(
                             LinearGradient(
@@ -554,7 +640,7 @@ struct ShopItemCard: View {
             
             // Bottom section with info
             VStack(alignment: .leading, spacing: 8) {
-                // Rarity and name
+                // Rarity and purchase count
                 HStack {
                     Text(item.rarity.rawValue.uppercased())
                         .font(.caption2)
@@ -562,6 +648,17 @@ struct ShopItemCard: View {
                         .foregroundColor(item.rarity.color)
                     
                     Spacer()
+                    
+                    if item.purchaseCount > 0 {
+                        HStack(spacing: 2) {
+                            Image(systemName: "cart.fill")
+                                .font(.caption2)
+                            Text("\(item.purchaseCount)")
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.white.opacity(0.6))
+                    }
                 }
                 
                 Text(item.name)

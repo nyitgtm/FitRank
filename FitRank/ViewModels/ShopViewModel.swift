@@ -17,13 +17,17 @@ class ShopViewModel: ObservableObject {
     @Published var lastPurchasedItem: ShopItem?
     
     private let db = Firestore.firestore()
+    private let userDefaultsKey = "purchasedItemIds"
     
     init() {
         Task {
             await loadInventory()
+            await loadShopItems()
         }
-        loadShopItems()
+        loadLocalPurchases()
     }
+    
+    // MARK: - Load Functions
     
     func loadInventory() async {
         guard let userId = Auth.auth().currentUser?.uid else { return }
@@ -32,23 +36,77 @@ class ShopViewModel: ObservableObject {
         defer { isLoading = false }
         
         do {
-            // Get user's token balance from Firebase
             let userDoc = try await db.collection("users").document(userId).getDocument()
             if let tokens = userDoc.data()?["tokens"] as? Int {
                 inventory.tokens = tokens
+            }
+            
+            // Load equipped items from Firebase
+            if let equippedTheme = userDoc.data()?["equippedThemeId"] as? String {
+                inventory.equippedThemeId = equippedTheme
+            }
+            if let equippedBadge = userDoc.data()?["equippedBadgeId"] as? String {
+                inventory.equippedBadgeId = equippedBadge
+            }
+            if let equippedTitle = userDoc.data()?["equippedTitleId"] as? String {
+                inventory.equippedTitleId = equippedTitle
             }
         } catch {
             print("Failed to load tokens: \(error)")
         }
     }
     
-    func refreshTokenBalance() async {
-        await loadInventory()
+    func loadShopItems() async {
+        do {
+            let snapshot = try await db.collection("shopItems").getDocuments()
+            
+            if snapshot.documents.isEmpty {
+                // Initialize shop items in Firestore
+                await initializeShopItems()
+            } else {
+                // Load from Firestore
+                shopItems = snapshot.documents.compactMap { doc -> ShopItem? in
+                    try? doc.data(as: ShopItem.self)
+                }
+            }
+        } catch {
+            print("Failed to load shop items: \(error)")
+            shopItems = ShopItem.allItems // Fallback to local items
+        }
     }
     
-    func loadShopItems() {
-        // In a real app, this would fetch from Firebase
-        shopItems = ShopItem.sampleItems
+    private func initializeShopItems() async {
+        let allItems = ShopItem.allItems
+        
+        for item in allItems {
+            do {
+                try db.collection("shopItems").document(item.id).setData(from: item)
+            } catch {
+                print("Failed to initialize item \(item.id): \(error)")
+            }
+        }
+        
+        shopItems = allItems
+    }
+    
+    private func loadLocalPurchases() {
+        if let savedIds = UserDefaults.standard.array(forKey: userDefaultsKey) as? [String] {
+            inventory.ownedItemIds = Set(savedIds)
+        }
+    }
+    
+    private func saveLocalPurchase(_ itemId: String) {
+        var purchases = UserDefaults.standard.array(forKey: userDefaultsKey) as? [String] ?? []
+        if !purchases.contains(itemId) {
+            purchases.append(itemId)
+            UserDefaults.standard.set(purchases, forKey: userDefaultsKey)
+        }
+    }
+    
+    // MARK: - Shop Actions
+    
+    func refreshTokenBalance() async {
+        await loadInventory()
     }
     
     func purchaseItem(_ item: ShopItem) {
@@ -69,31 +127,62 @@ class ShopViewModel: ObservableObject {
         
         Task {
             do {
-                // Deduct tokens in Firebase
-                try await db.collection("users").document(userId).updateData([
+                // Create a batch write
+                let batch = db.batch()
+                
+                // 1. Deduct tokens from user
+                let userRef = db.collection("users").document(userId)
+                batch.updateData([
                     "tokens": FieldValue.increment(Int64(-item.price))
-                ])
+                ], forDocument: userRef)
+                
+                // 2. Increment purchase count for item
+                let itemRef = db.collection("shopItems").document(item.id)
+                batch.updateData([
+                    "purchaseCount": FieldValue.increment(Int64(1))
+                ], forDocument: itemRef)
+                
+                // 3. Record purchase in user's purchases subcollection
+                let purchaseRef = db.collection("users").document(userId).collection("purchases").document(item.id)
+                batch.setData([
+                    "itemId": item.id,
+                    "itemName": item.name,
+                    "price": item.price,
+                    "purchasedAt": FieldValue.serverTimestamp(),
+                    "type": item.type.rawValue
+                ], forDocument: purchaseRef)
+                
+                // Commit batch
+                try await batch.commit()
                 
                 // Update local inventory
                 inventory.tokens -= item.price
                 inventory.ownedItemIds.insert(item.id)
                 
+                // Save purchase locally
+                saveLocalPurchase(item.id)
+                
                 // Auto-equip if it's the first of its type
                 switch item.type {
                 case .theme:
                     if inventory.equippedThemeId == nil {
-                        inventory.equippedThemeId = item.id
+                        await equipItem(item)
                     }
                 case .badge:
                     if inventory.equippedBadgeId == nil {
-                        inventory.equippedBadgeId = item.id
+                        await equipItem(item)
                     }
                 case .title:
                     if inventory.equippedTitleId == nil {
-                        inventory.equippedTitleId = item.id
+                        await equipItem(item)
                     }
-                case .effect:
-                    break
+                case .merchandise:
+                    break // Merchandise doesn't get equipped
+                }
+                
+                // Update purchase count in local item
+                if let index = shopItems.firstIndex(where: { $0.id == item.id }) {
+                    shopItems[index].purchaseCount += 1
                 }
                 
                 lastPurchasedItem = item
@@ -105,17 +194,27 @@ class ShopViewModel: ObservableObject {
         }
     }
     
-    func equipItem(_ item: ShopItem) {
+    func equipItem(_ item: ShopItem) async {
         guard inventory.ownedItemIds.contains(item.id) else { return }
+        guard let userId = Auth.auth().currentUser?.uid else { return }
         
         switch item.type {
         case .theme:
             inventory.equippedThemeId = item.id
+            try? await db.collection("users").document(userId).updateData([
+                "equippedThemeId": item.id
+            ])
         case .badge:
             inventory.equippedBadgeId = item.id
+            try? await db.collection("users").document(userId).updateData([
+                "equippedBadgeId": item.id
+            ])
         case .title:
             inventory.equippedTitleId = item.id
-        case .effect:
+            try? await db.collection("users").document(userId).updateData([
+                "equippedTitleId": item.id
+            ])
+        case .merchandise:
             break
         }
     }
