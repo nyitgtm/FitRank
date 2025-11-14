@@ -601,7 +601,7 @@ struct ShopItemCard: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Top section with icon and rarity
+            // Top section with image/icon and rarity
             ZStack(alignment: .topLeading) {
                 // Gradient background based on rarity
                 LinearGradient(
@@ -625,15 +625,44 @@ struct ShopItemCard: View {
                         Spacer()
                     }
                     .padding(8)
+                    .zIndex(1)
                 }
                 
-                // Icon in center
+                // Image or Icon in center
                 VStack {
                     Spacer()
-                    Image(systemName: item.iconName)
-                        .font(.system(size: 50, weight: .bold))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                    if let imageUrl = item.imageUrl, !imageUrl.isEmpty {
+                        AsyncImage(url: URL(string: imageUrl)) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .tint(.white)
+                                    .frame(width: 80, height: 80)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxWidth: 100, maxHeight: 100)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                            case .failure:
+                                Image(systemName: item.iconName)
+                                    .font(.system(size: 50, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                            @unknown default:
+                                Image(systemName: item.iconName)
+                                    .font(.system(size: 50, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                            }
+                        }
+                    } else {
+                        Image(systemName: item.iconName)
+                            .font(.system(size: 50, weight: .bold))
+                            .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                    }
                     Spacer()
                 }
             }
@@ -642,7 +671,7 @@ struct ShopItemCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 // Rarity and purchase count
                 HStack {
-                    Text(item.rarity.rawValue.uppercased())
+                    Text(item.rarity.displayName.uppercased())
                         .font(.caption2)
                         .fontWeight(.black)
                         .foregroundColor(item.rarity.color)
