@@ -30,6 +30,7 @@ struct ItemShopView: View {
     @State private var claimedAmount = 0
     @State private var currentTime = Date()
     @State private var selectedCategory: ShopCategory = .all
+    @State private var isTasksExpanded = true
     
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
@@ -74,6 +75,7 @@ struct ItemShopView: View {
                             isLoading: isLoadingTasks,
                             isClaiming: isClaiming,
                             currentTime: currentTime,
+                            isExpanded: $isTasksExpanded,
                             onClaimComments: { claimRewards(type: .comments) },
                             onClaimUploads: { claimRewards(type: .uploads) },
                             onClaimLikes: { claimRewards(type: .likes) }
@@ -300,81 +302,101 @@ struct DailyTasksCard: View {
     let isLoading: Bool
     let isClaiming: Bool
     let currentTime: Date
+    @Binding var isExpanded: Bool
     let onClaimComments: () -> Void
     let onClaimUploads: () -> Void
     let onClaimLikes: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "checklist")
-                    .font(.title2)
-                    .foregroundColor(.yellow)
-                
-                Text("Daily Coin Tasks")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                if isLoading {
-                    ProgressView()
-                        .tint(.white)
+        VStack(alignment: .leading, spacing: 0) {
+            // Header (always visible)
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isExpanded.toggle()
                 }
+            }) {
+                HStack {
+                    Image(systemName: "checklist")
+                        .font(.title2)
+                        .foregroundColor(.yellow)
+                    
+                    Text("Daily Coin Tasks")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.yellow)
+                    }
+                }
+                .padding()
             }
             
-            if let tasks = dailyTasks {
+            // Expandable content
+            if isExpanded {
                 VStack(spacing: 12) {
-                    // Comments Progress
-                    DailyTaskRow(
-                        icon: "bubble.left.fill",
-                        title: "Leave Comments",
-                        current: tasks.commentsCount,
-                        max: DailyTasks.maxComments,
-                        coinsPerAction: DailyTasks.coinsPerComment,
-                        canClaim: tasks.canClaimComments,
-                        isClaimed: tasks.commentsClaimed,
-                        timeRemaining: tasks.commentsTimeRemaining,
-                        isClaiming: isClaiming,
-                        onClaim: onClaimComments
-                    )
-                    
-                    // Upload Progress
-                    DailyTaskRow(
-                        icon: "arrow.up.circle.fill",
-                        title: "Upload Workout",
-                        current: tasks.uploadsCount,
-                        max: DailyTasks.maxUploads,
-                        coinsPerAction: DailyTasks.coinsPerUpload,
-                        canClaim: tasks.canClaimUploads,
-                        isClaimed: tasks.uploadsClaimed,
-                        timeRemaining: tasks.uploadsTimeRemaining,
-                        isClaiming: isClaiming,
-                        onClaim: onClaimUploads
-                    )
-                    
-                    // Likes Progress
-                    DailyTaskRow(
-                        icon: "heart.fill",
-                        title: "Like Posts",
-                        current: tasks.likesCount,
-                        max: DailyTasks.maxLikes,
-                        coinsPerAction: DailyTasks.coinsPerLike,
-                        canClaim: tasks.canClaimLikes,
-                        isClaimed: tasks.likesClaimed,
-                        timeRemaining: tasks.likesTimeRemaining,
-                        isClaiming: isClaiming,
-                        onClaim: onClaimLikes
-                    )
+                    if let tasks = dailyTasks {
+                        // Comments Progress
+                        DailyTaskRow(
+                            icon: "bubble.left.fill",
+                            title: "Leave Comments",
+                            current: tasks.commentsCount,
+                            max: DailyTasks.maxComments,
+                            coinsPerAction: DailyTasks.coinsPerComment,
+                            canClaim: tasks.canClaimComments,
+                            isClaimed: tasks.commentsClaimed,
+                            timeRemaining: tasks.commentsTimeRemaining,
+                            isClaiming: isClaiming,
+                            onClaim: onClaimComments
+                        )
+                        
+                        // Upload Progress
+                        DailyTaskRow(
+                            icon: "arrow.up.circle.fill",
+                            title: "Upload Workout",
+                            current: tasks.uploadsCount,
+                            max: DailyTasks.maxUploads,
+                            coinsPerAction: DailyTasks.coinsPerUpload,
+                            canClaim: tasks.canClaimUploads,
+                            isClaimed: tasks.uploadsClaimed,
+                            timeRemaining: tasks.uploadsTimeRemaining,
+                            isClaiming: isClaiming,
+                            onClaim: onClaimUploads
+                        )
+                        
+                        // Likes Progress
+                        DailyTaskRow(
+                            icon: "heart.fill",
+                            title: "Like Posts",
+                            current: tasks.likesCount,
+                            max: DailyTasks.maxLikes,
+                            coinsPerAction: DailyTasks.coinsPerLike,
+                            canClaim: tasks.canClaimLikes,
+                            isClaimed: tasks.likesClaimed,
+                            timeRemaining: tasks.likesTimeRemaining,
+                            isClaiming: isClaiming,
+                            onClaim: onClaimLikes
+                        )
+                    } else {
+                        Text("Loading tasks...")
+                            .foregroundColor(.white.opacity(0.7))
+                            .font(.subheadline)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
-            } else {
-                Text("Loading tasks...")
-                    .foregroundColor(.white.opacity(0.7))
-                    .font(.subheadline)
+                .padding(.horizontal)
+                .padding(.bottom)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.white.opacity(0.1))
