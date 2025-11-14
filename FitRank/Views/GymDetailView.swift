@@ -292,17 +292,15 @@ class GymDetailViewModel: ObservableObject {
     }
     
     func loadData() async {
-        // Load basic info first (fast)
+        isInitialLoading = false   // moved up
+
         if let ownerTeamId = gym.ownerTeamId, ownerTeamId != "teams/0" {
             await loadOwnerTeam(teamId: ownerTeamId)
         }
-        
-        // Show content immediately
-        isInitialLoading = false
-        
-        // Then load workouts in background
+
         await loadBestLifts()
     }
+
     
     private func loadOwnerTeam(teamId: String) async {
         do {
