@@ -2,6 +2,7 @@ import SwiftUI
 import Foundation
 import FirebaseAuth
 import Combine
+import FirebaseFirestore
 
 struct ProfileView: View {
     @StateObject private var userViewModel = UserViewModel()
@@ -11,6 +12,7 @@ struct ProfileView: View {
     
     @Binding var showSignInView: Bool
     @State private var teamName: String = "Loading..."
+    @State private var equippedBadge: ShopItem?
     
     var body: some View {
         NavigationView {
@@ -27,7 +29,7 @@ struct ProfileView: View {
                         VStack(spacing: 28) {
                             
                             // Header
-                            ModernProfileHeaderView(user: user)
+                            ModernProfileHeaderView(user: user, equippedBadge: equippedBadge)
                             
                             // Info Cards
                             VStack(spacing: 20) {
@@ -111,6 +113,9 @@ struct ProfileView: View {
                     teamName = "No Team"
                 }
                 
+                // Load equipped badge
+                await loadEquippedBadge(userId: uid)
+                
                 // Fetch actual user workouts
                 await workoutViewModel.fetchAllUserWorkouts(userId: uid)
             } else {
@@ -123,40 +128,170 @@ struct ProfileView: View {
             showSignInView = true
         }
     }
+    
+    private func loadEquippedBadge(userId: String) async {
+        let db = Firestore.firestore()
+        
+        do {
+            // Get user's equipped badge ID
+            let userDoc = try await db.collection("users").document(userId).getDocument()
+            guard let equippedBadgeId = userDoc.data()?["equippedBadgeId"] as? String else {
+                print("No equipped badge")
+                return
+            }
+            
+            // Fetch the badge details from shopItems
+            let badgeDoc = try await db.collection("shopItems").document(equippedBadgeId).getDocument()
+            let data = badgeDoc.data()
+            
+            guard let name = data?["name"] as? String,
+                  let description = data?["description"] as? String,
+                  let price = data?["price"] as? Int,
+                  let rarityString = data?["rarity"] as? String,
+                  let categoryString = data?["category"] as? String,
+                  let rarity = ItemRarity(rawValue: rarityString),
+                  let category = ShopItemType(rawValue: categoryString) else {
+                return
+            }
+            
+            let isActive = data?["isActive"] as? Bool ?? true
+            let isFeatured = data?["isFeatured"] as? Bool ?? false
+            let purchaseCount = data?["purchaseCount"] as? Int ?? 0
+            let imageUrl = data?["imageUrl"] as? String
+            
+            let createdAt = (data?["createdAt"] as? Timestamp)?.dateValue()
+            let availableUntil = (data?["availableUntil"] as? Timestamp)?.dateValue()
+            
+            equippedBadge = ShopItem(
+                id: badgeDoc.documentID,
+                name: name,
+                description: description,
+                price: price,
+                rarity: rarity,
+                category: category,
+                imageUrl: imageUrl,
+                isActive: isActive,
+                isFeatured: isFeatured,
+                createdAt: createdAt,
+                availableUntil: availableUntil,
+                purchaseCount: purchaseCount
+            )
+            
+            print("✅ Loaded equipped badge: \(name)")
+            
+        } catch {
+            print("❌ Failed to load equipped badge: \(error)")
+        }
+    }
 }
 
 // MARK: - Modernized Components
 
 struct ModernProfileHeaderView: View {
     let user: User
+    let equippedBadge: ShopItem?
     
     var body: some View {
         VStack(spacing: 16) {
-            // Profile Picture
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            // Profile Picture with Badge
+            ZStack(alignment: .bottomTrailing) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .frame(width: 100, height: 100)
-                .overlay(
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(.white)
-                )
-                .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
+                    .frame(width: 100, height: 100)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.white)
+                    )
+                    .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
+                
+                // Equipped Badge
+                if let badge = equippedBadge {
+                    if let imageUrl = badge.imageUrl, !imageUrl.isEmpty {
+                        AsyncImage(url: URL(string: imageUrl)) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 35, height: 35)
+                                    .background(
+                                        Circle()
+                                            .fill(badge.rarity.color.opacity(0.9))
+                                            .frame(width: 40, height: 40)
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .stroke(badge.rarity.color, lineWidth: 2)
+                                            .frame(width: 40, height: 40)
+                                    )
+                                    .shadow(color: badge.rarity.color.opacity(0.5), radius: 4, x: 0, y: 2)
+                            case .failure, .empty:
+                                Image(systemName: badge.iconName)
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.white)
+                                    .frame(width: 35, height: 35)
+                                    .background(
+                                        Circle()
+                                            .fill(badge.rarity.color.opacity(0.9))
+                                            .frame(width: 40, height: 40)
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .stroke(badge.rarity.color, lineWidth: 2)
+                                            .frame(width: 40, height: 40)
+                                    )
+                                    .shadow(color: badge.rarity.color.opacity(0.5), radius: 4, x: 0, y: 2)
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                        .offset(x: 5, y: 5)
+                    }
+                }
+            }
             
-            Text(user.name)
-                .font(.title)
-                .fontWeight(.bold)
-                .foregroundColor(.primary)
-            
-            Text("@\(user.username)")
-                .font(.title3)
-                .foregroundColor(.secondary)
+            VStack(spacing: 4) {
+                Text(user.name)
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                
+                HStack(spacing: 8) {
+                    Text("@\(user.username)")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                    
+                    // Badge name next to username
+                    if let badge = equippedBadge {
+                        HStack(spacing: 4) {
+                            Text("•")
+                                .foregroundColor(.secondary)
+                            
+                            Text(badge.name)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(badge.rarity.color)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Capsule()
+                                        .fill(badge.rarity.color.opacity(0.15))
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(badge.rarity.color.opacity(0.3), lineWidth: 1)
+                                )
+                        }
+                    }
+                }
+            }
             
             if user.isCoach {
                 Label("Coach", systemImage: "shield.fill")
@@ -401,5 +536,3 @@ struct AppearanceNavigationCard: View {
 #Preview {
     ProfileView(showSignInView: .constant(false))
 }
-
-
