@@ -159,7 +159,8 @@ class ShopViewModel: ObservableObject {
             return
         }
         
-        guard !inventory.ownedItemIds.contains(item.id) else {
+        // For merchandise, allow repurchase. For other items, check if already owned
+        if item.type != .merchandise && inventory.ownedItemIds.contains(item.id) {
             errorMessage = "You already own this item!"
             return
         }
@@ -191,7 +192,11 @@ class ShopViewModel: ObservableObject {
                 }
                 
                 // 3. Record purchase in user's purchases subcollection
-                let purchaseRef = db.collection("users").document(userId).collection("purchases").document(item.id)
+                // For merchandise, use a unique document ID with timestamp
+                let purchaseDocId = item.type == .merchandise ? 
+                    "\(item.id)_\(Int(Date().timeIntervalSince1970))" : item.id
+                
+                let purchaseRef = db.collection("users").document(userId).collection("purchases").document(purchaseDocId)
                 batch.setData([
                     "itemId": item.id,
                     "itemName": item.name,
@@ -205,27 +210,35 @@ class ShopViewModel: ObservableObject {
                 
                 // Update local inventory
                 inventory.tokens -= item.price
-                inventory.ownedItemIds.insert(item.id)
                 
-                // Save purchase locally
-                saveLocalPurchase(item.id)
+                // Only save to owned items if it's not merchandise (or first purchase)
+                if item.type != .merchandise {
+                    inventory.ownedItemIds.insert(item.id)
+                    saveLocalPurchase(item.id)
+                } else if !inventory.ownedItemIds.contains(item.id) {
+                    // First time purchasing this merchandise
+                    inventory.ownedItemIds.insert(item.id)
+                    saveLocalPurchase(item.id)
+                }
                 
-                // Auto-equip if it's the first of its type
-                switch item.category {
-                case .theme:
-                    if inventory.equippedThemeId == nil {
-                        await equipItem(item)
+                // Auto-equip if it's the first of its type (not for merchandise)
+                if item.type != .merchandise {
+                    switch item.category {
+                    case .theme:
+                        if inventory.equippedThemeId == nil {
+                            await equipItem(item)
+                        }
+                    case .badge:
+                        if inventory.equippedBadgeId == nil {
+                            await equipItem(item)
+                        }
+                    case .title:
+                        if inventory.equippedTitleId == nil {
+                            await equipItem(item)
+                        }
+                    case .merchandise:
+                        break
                     }
-                case .badge:
-                    if inventory.equippedBadgeId == nil {
-                        await equipItem(item)
-                    }
-                case .title:
-                    if inventory.equippedTitleId == nil {
-                        await equipItem(item)
-                    }
-                case .merchandise:
-                    break // Merchandise doesn't get equipped
                 }
                 
                 // Update purchase count in local item

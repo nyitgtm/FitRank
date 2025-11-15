@@ -131,7 +131,11 @@ struct ItemShopView: View {
                                         isOwned: viewModel.inventory.ownedItemIds.contains(item.id),
                                         isEquipped: isItemEquipped(item)
                                     ) {
-                                        if viewModel.inventory.ownedItemIds.contains(item.id) {
+                                        // For merchandise, always allow purchase
+                                        // For other items, only equip if already owned
+                                        if item.type == .merchandise {
+                                            viewModel.purchaseItem(item)
+                                        } else if viewModel.inventory.ownedItemIds.contains(item.id) {
                                             Task {
                                                 await viewModel.equipItem(item)
                                             }
@@ -691,7 +695,7 @@ struct ShopItemCard: View {
             
             // Bottom section with info
             VStack(alignment: .leading, spacing: 8) {
-                // Rarity and purchase count
+                // Rarity (no purchase count for merchandise)
                 HStack {
                     Text(item.rarity.displayName.uppercased())
                         .font(.caption2)
@@ -700,7 +704,8 @@ struct ShopItemCard: View {
                     
                     Spacer()
                     
-                    if item.purchaseCount > 0 {
+                    // Only show purchase count for non-merchandise items
+                    if item.type != .merchandise && item.purchaseCount > 0 {
                         HStack(spacing: 2) {
                             Image(systemName: "cart.fill")
                                 .font(.caption2)
@@ -725,40 +730,96 @@ struct ShopItemCard: View {
                 
                 Spacer()
                 
-                // Purchase/Equip button
-                Button(action: onTap) {
-                    HStack {
-                        if isOwned {
-                            if isEquipped {
-                                Text("EQUIPPED")
-                                    .font(.caption)
-                                    .fontWeight(.black)
+                // Purchase/Equip button based on item type
+                if item.type == .merchandise {
+                    // Merchandise: Show "Previously Bought" if owned, else purchase button
+                    if isOwned {
+                        VStack(spacing: 6) {
+                            HStack {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.caption)
-                            } else {
-                                Text("EQUIP")
+                                    .foregroundColor(.green)
+                                Text("PREVIOUSLY BOUGHT")
+                                    .font(.caption2)
+                                    .fontWeight(.black)
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(8)
+                            
+                            // Purchase again button
+                            Button(action: onTap) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "star.fill")
+                                        .font(.caption2)
+                                    Text("\(item.price)")
+                                        .font(.caption)
+                                        .fontWeight(.black)
+                                    Text("• BUY AGAIN")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                }
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.white)
+                                .cornerRadius(8)
+                            }
+                        }
+                    } else {
+                        Button(action: onTap) {
+                            HStack {
+                                Image(systemName: "star.fill")
+                                    .font(.caption2)
+                                Text("\(item.price)")
                                     .font(.caption)
                                     .fontWeight(.black)
                             }
-                        } else {
-                            Image(systemName: "star.fill")
-                                .font(.caption2)
-                            Text("\(item.price)")
-                                .font(.caption)
-                                .fontWeight(.black)
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.white)
+                            .cornerRadius(8)
                         }
                     }
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(
-                        isEquipped ? Color.green :
-                        isOwned ? Color.cyan :
-                        Color.white
-                    )
-                    .cornerRadius(8)
+                } else {
+                    // Non-merchandise: Show equip/equipped
+                    Button(action: onTap) {
+                        HStack {
+                            if isOwned {
+                                if isEquipped {
+                                    Text("EQUIPPED")
+                                        .font(.caption)
+                                        .fontWeight(.black)
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.caption)
+                                } else {
+                                    Text("EQUIP")
+                                        .font(.caption)
+                                        .fontWeight(.black)
+                                }
+                            } else {
+                                Image(systemName: "star.fill")
+                                    .font(.caption2)
+                                Text("\(item.price)")
+                                    .font(.caption)
+                                    .fontWeight(.black)
+                            }
+                        }
+                        .foregroundColor(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(
+                            isEquipped ? Color.green :
+                            isOwned ? Color.cyan :
+                            Color.white
+                        )
+                        .cornerRadius(8)
+                    }
+                    .disabled(isEquipped)
                 }
-                .disabled(isEquipped)
             }
             .padding(12)
             .background(Color(red: 0.15, green: 0.17, blue: 0.25))
