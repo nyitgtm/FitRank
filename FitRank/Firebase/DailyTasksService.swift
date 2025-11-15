@@ -2,7 +2,7 @@
 //  DailyTasksService.swift
 //  FitRank
 //
-//  Service to handle daily task tracking and coin rewards
+//  Service to handle daily task tracking and coin rewards (LOCAL STORAGE ONLY)
 //
 
 import Foundation
@@ -13,48 +13,54 @@ class DailyTasksService {
     static let shared = DailyTasksService()
     private let db = Firestore.firestore()
     
+    private let userDefaults = UserDefaults.standard
+    private let tasksKey = "dailyTasks_"
+    
     private init() {}
     
-    // MARK: - Get Today's Tasks
+    // MARK: - Get Today's Tasks (Local)
     
     func getTodaysTasks(userId: String) async throws -> DailyTasks {
         let today = Calendar.current.startOfDay(for: Date())
         let dateString = formatDate(today)
+        let key = "\(tasksKey)\(userId)_\(dateString)"
         
-        let docRef = db.collection("dailyTasks").document("\(userId)_\(dateString)")
-        let document = try await docRef.getDocument()
-        
-        if var tasks = try? document.data(as: DailyTasks.self), tasks.isToday {
-            // Check if any tasks need to be reset
+        // Try to load from UserDefaults
+        if let data = userDefaults.data(forKey: key),
+           let tasks = try? JSONDecoder().decode(DailyTasks.self, from: data),
+           tasks.isToday {
+            
+            var updatedTasks = tasks
             var needsUpdate = false
             
-            if tasks.canResetComments {
-                tasks.commentsCount = 0
-                tasks.commentsClaimed = false
-                tasks.commentsClaimedAt = nil
+            // Check if any tasks need to be reset
+            if updatedTasks.canResetComments {
+                updatedTasks.commentsCount = 0
+                updatedTasks.commentsClaimed = false
+                updatedTasks.commentsClaimedAt = nil
                 needsUpdate = true
             }
             
-            if tasks.canResetUploads {
-                tasks.uploadsCount = 0
-                tasks.uploadsClaimed = false
-                tasks.uploadsClaimedAt = nil
+            if updatedTasks.canResetUploads {
+                updatedTasks.uploadsCount = 0
+                updatedTasks.uploadsClaimed = false
+                updatedTasks.uploadsClaimedAt = nil
                 needsUpdate = true
             }
             
-            if tasks.canResetLikes {
-                tasks.likesCount = 0
-                tasks.likesClaimed = false
-                tasks.likesClaimedAt = nil
+            if updatedTasks.canResetLikes {
+                updatedTasks.likesCount = 0
+                updatedTasks.likesClaimed = false
+                updatedTasks.likesClaimedAt = nil
                 needsUpdate = true
             }
             
-            // Save reset tasks
+            // Save reset tasks locally
             if needsUpdate {
-                try await docRef.setData(from: tasks)
+                saveTasks(updatedTasks, key: key)
             }
             
-            return tasks
+            return updatedTasks
         } else {
             // Create new daily tasks for today
             let newTasks = DailyTasks(
@@ -71,8 +77,17 @@ class DailyTasksService {
                 likesClaimedAt: nil,
                 lastUpdated: Date()
             )
-            try await docRef.setData(from: newTasks)
+            saveTasks(newTasks, key: key)
             return newTasks
+        }
+    }
+    
+    // MARK: - Save Tasks Locally
+    
+    private func saveTasks(_ tasks: DailyTasks, key: String) {
+        if let data = try? JSONEncoder().encode(tasks) {
+            userDefaults.set(data, forKey: key)
+            print("💾 Saved tasks locally: \(key)")
         }
     }
     
@@ -90,12 +105,13 @@ class DailyTasksService {
         tasks.commentsCount += 1
         tasks.lastUpdated = Date()
         
-        // Save updated tasks
+        // Save updated tasks locally
         let dateString = formatDate(tasks.date)
-        let docRef = db.collection("dailyTasks").document("\(userId)_\(dateString)")
-        try await docRef.setData(from: tasks)
+        let key = "\(tasksKey)\(userId)_\(dateString)"
+        saveTasks(tasks, key: key)
         
         let maxed = tasks.commentsCount >= DailyTasks.maxComments
+        print("📝 Tracked comment: \(tasks.commentsCount)/\(DailyTasks.maxComments)")
         return (tasks.commentsCount, maxed)
     }
     
@@ -113,12 +129,13 @@ class DailyTasksService {
         tasks.uploadsCount += 1
         tasks.lastUpdated = Date()
         
-        // Save updated tasks
+        // Save updated tasks locally
         let dateString = formatDate(tasks.date)
-        let docRef = db.collection("dailyTasks").document("\(userId)_\(dateString)")
-        try await docRef.setData(from: tasks)
+        let key = "\(tasksKey)\(userId)_\(dateString)"
+        saveTasks(tasks, key: key)
         
         let maxed = tasks.uploadsCount >= DailyTasks.maxUploads
+        print("⬆️ Tracked upload: \(tasks.uploadsCount)/\(DailyTasks.maxUploads)")
         return (tasks.uploadsCount, maxed)
     }
     
@@ -136,12 +153,13 @@ class DailyTasksService {
         tasks.likesCount += 1
         tasks.lastUpdated = Date()
         
-        // Save updated tasks
+        // Save updated tasks locally
         let dateString = formatDate(tasks.date)
-        let docRef = db.collection("dailyTasks").document("\(userId)_\(dateString)")
-        try await docRef.setData(from: tasks)
+        let key = "\(tasksKey)\(userId)_\(dateString)"
+        saveTasks(tasks, key: key)
         
         let maxed = tasks.likesCount >= DailyTasks.maxLikes
+        print("❤️ Tracked like: \(tasks.likesCount)/\(DailyTasks.maxLikes)")
         return (tasks.likesCount, maxed)
     }
     
@@ -162,17 +180,18 @@ class DailyTasksService {
         tasks.commentsClaimedAt = Date()
         tasks.lastUpdated = Date()
         
-        // Save updated tasks
+        // Save updated tasks locally
         let dateString = formatDate(tasks.date)
-        let docRef = db.collection("dailyTasks").document("\(userId)_\(dateString)")
-        try await docRef.setData(from: tasks)
+        let key = "\(tasksKey)\(userId)_\(dateString)"
+        saveTasks(tasks, key: key)
         
-        // Add coins to user
+        // Add coins to Firebase user
         let userRef = db.collection("users").document(userId)
         try await userRef.updateData([
             "tokens": FieldValue.increment(Int64(coinsToAward))
         ])
         
+        print("✅ Claimed comment rewards: \(coinsToAward) coins")
         return coinsToAward
     }
     
@@ -193,17 +212,18 @@ class DailyTasksService {
         tasks.uploadsClaimedAt = Date()
         tasks.lastUpdated = Date()
         
-        // Save updated tasks
+        // Save updated tasks locally
         let dateString = formatDate(tasks.date)
-        let docRef = db.collection("dailyTasks").document("\(userId)_\(dateString)")
-        try await docRef.setData(from: tasks)
+        let key = "\(tasksKey)\(userId)_\(dateString)"
+        saveTasks(tasks, key: key)
         
-        // Add coins to user
+        // Add coins to Firebase user
         let userRef = db.collection("users").document(userId)
         try await userRef.updateData([
             "tokens": FieldValue.increment(Int64(coinsToAward))
         ])
         
+        print("✅ Claimed upload rewards: \(coinsToAward) coins")
         return coinsToAward
     }
     
@@ -224,17 +244,18 @@ class DailyTasksService {
         tasks.likesClaimedAt = Date()
         tasks.lastUpdated = Date()
         
-        // Save updated tasks
+        // Save updated tasks locally
         let dateString = formatDate(tasks.date)
-        let docRef = db.collection("dailyTasks").document("\(userId)_\(dateString)")
-        try await docRef.setData(from: tasks)
+        let key = "\(tasksKey)\(userId)_\(dateString)"
+        saveTasks(tasks, key: key)
         
-        // Add coins to user
+        // Add coins to Firebase user
         let userRef = db.collection("users").document(userId)
         try await userRef.updateData([
             "tokens": FieldValue.increment(Int64(coinsToAward))
         ])
         
+        print("✅ Claimed like rewards: \(coinsToAward) coins")
         return coinsToAward
     }
     
@@ -244,6 +265,25 @@ class DailyTasksService {
         let result = try await trackComment(userId: userId)
         // Return 0 coins since they need to claim now
         return (0, result.newCount, result.maxed)
+    }
+    
+    // MARK: - Clear Old Tasks (Optional cleanup)
+    
+    func clearOldTasks() {
+        let allKeys = userDefaults.dictionaryRepresentation().keys
+        let taskKeys = allKeys.filter { $0.hasPrefix(tasksKey) }
+        
+        let today = Calendar.current.startOfDay(for: Date())
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
+        
+        for key in taskKeys {
+            if let data = userDefaults.data(forKey: key),
+               let tasks = try? JSONDecoder().decode(DailyTasks.self, from: data),
+               tasks.date < yesterday {
+                userDefaults.removeObject(forKey: key)
+                print("🗑️ Cleared old task: \(key)")
+            }
+        }
     }
     
     // MARK: - Helper

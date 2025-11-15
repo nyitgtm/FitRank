@@ -12,6 +12,14 @@ enum ClaimType {
     case likes
 }
 
+enum ShopCategory: String, CaseIterable {
+    case all = "All"
+    case themes = "Themes"
+    case merchandise = "Merch"
+    case badges = "Badges"
+    case titles = "Titles"
+}
+
 struct ItemShopView: View {
     @StateObject private var viewModel = ShopViewModel()
     @Environment(\.dismiss) private var dismiss
@@ -21,8 +29,25 @@ struct ItemShopView: View {
     @State private var showClaimSuccess = false
     @State private var claimedAmount = 0
     @State private var currentTime = Date()
+    @State private var selectedCategory: ShopCategory = .all
+    @State private var isTasksExpanded = true
     
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
+    var filteredItems: [ShopItem] {
+        switch selectedCategory {
+        case .all:
+            return viewModel.shopItems
+        case .themes:
+            return viewModel.shopItems.filter { $0.type == .theme }
+        case .merchandise:
+            return viewModel.shopItems.filter { $0.type == .merchandise }
+        case .badges:
+            return viewModel.shopItems.filter { $0.type == .badge }
+        case .titles:
+            return viewModel.shopItems.filter { $0.type == .title }
+        }
+    }
     
     var body: some View {
         NavigationView {
@@ -50,14 +75,33 @@ struct ItemShopView: View {
                             isLoading: isLoadingTasks,
                             isClaiming: isClaiming,
                             currentTime: currentTime,
+                            isExpanded: $isTasksExpanded,
                             onClaimComments: { claimRewards(type: .comments) },
                             onClaimUploads: { claimRewards(type: .uploads) },
                             onClaimLikes: { claimRewards(type: .likes) }
                         )
                         .padding(.horizontal)
                         
+                        // Category Picker
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(ShopCategory.allCases, id: \.self) { category in
+                                    CategoryButton(
+                                        category: category,
+                                        isSelected: selectedCategory == category
+                                    ) {
+                                        withAnimation {
+                                            selectedCategory = category
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                        .padding(.top, 8)
+                        
                         // Shop items grid
-                        Text("Shop Items")
+                        Text("\(selectedCategory.rawValue)")
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
@@ -65,25 +109,44 @@ struct ItemShopView: View {
                             .padding(.horizontal)
                             .padding(.top, 8)
                         
-                        LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 16),
-                            GridItem(.flexible(), spacing: 16)
-                        ], spacing: 16) {
-                            ForEach(viewModel.shopItems) { item in
-                                ShopItemCard(
-                                    item: item,
-                                    isOwned: viewModel.inventory.ownedItemIds.contains(item.id),
-                                    isEquipped: isItemEquipped(item)
-                                ) {
-                                    if viewModel.inventory.ownedItemIds.contains(item.id) {
-                                        viewModel.equipItem(item)
-                                    } else {
-                                        viewModel.purchaseItem(item)
+                        if filteredItems.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "cart")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.white.opacity(0.3))
+                                Text("No items in this category")
+                                    .font(.subheadline)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 40)
+                        } else {
+                            LazyVGrid(columns: [
+                                GridItem(.flexible(), spacing: 16),
+                                GridItem(.flexible(), spacing: 16)
+                            ], spacing: 16) {
+                                ForEach(filteredItems) { item in
+                                    ShopItemCard(
+                                        item: item,
+                                        isOwned: viewModel.inventory.ownedItemIds.contains(item.id),
+                                        isEquipped: isItemEquipped(item)
+                                    ) {
+                                        // For merchandise, always allow purchase
+                                        // For other items, only equip if already owned
+                                        if item.type == .merchandise {
+                                            viewModel.purchaseItem(item)
+                                        } else if viewModel.inventory.ownedItemIds.contains(item.id) {
+                                            Task {
+                                                await viewModel.equipItem(item)
+                                            }
+                                        } else {
+                                            viewModel.purchaseItem(item)
+                                        }
                                     }
                                 }
                             }
+                            .padding(.horizontal)
                         }
-                        .padding(.horizontal)
                     }
                     .padding(.vertical)
                 }
@@ -199,8 +262,40 @@ struct ItemShopView: View {
             return viewModel.inventory.equippedBadgeId == item.id
         case .title:
             return viewModel.inventory.equippedTitleId == item.id
-        case .effect:
+        case .merchandise:
             return false
+        }
+    }
+}
+
+// MARK: - Category Button
+struct CategoryButton: View {
+    let category: ShopCategory
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(category.rawValue)
+                .font(.subheadline)
+                .fontWeight(isSelected ? .bold : .medium)
+                .foregroundColor(isSelected ? .black : .white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    isSelected ?
+                    LinearGradient(
+                        colors: [.yellow, .orange],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ) :
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.2), Color.white.opacity(0.1)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(20)
         }
     }
 }
@@ -211,81 +306,101 @@ struct DailyTasksCard: View {
     let isLoading: Bool
     let isClaiming: Bool
     let currentTime: Date
+    @Binding var isExpanded: Bool
     let onClaimComments: () -> Void
     let onClaimUploads: () -> Void
     let onClaimLikes: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "checklist")
-                    .font(.title2)
-                    .foregroundColor(.yellow)
-                
-                Text("Daily Coin Tasks")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                if isLoading {
-                    ProgressView()
-                        .tint(.white)
+        VStack(alignment: .leading, spacing: 0) {
+            // Header (always visible)
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isExpanded.toggle()
                 }
+            }) {
+                HStack {
+                    Image(systemName: "checklist")
+                        .font(.title2)
+                        .foregroundColor(.yellow)
+                    
+                    Text("Daily Coin Tasks")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.yellow)
+                    }
+                }
+                .padding()
             }
             
-            if let tasks = dailyTasks {
+            // Expandable content
+            if isExpanded {
                 VStack(spacing: 12) {
-                    // Comments Progress
-                    DailyTaskRow(
-                        icon: "bubble.left.fill",
-                        title: "Leave Comments",
-                        current: tasks.commentsCount,
-                        max: DailyTasks.maxComments,
-                        coinsPerAction: DailyTasks.coinsPerComment,
-                        canClaim: tasks.canClaimComments,
-                        isClaimed: tasks.commentsClaimed,
-                        timeRemaining: tasks.commentsTimeRemaining,
-                        isClaiming: isClaiming,
-                        onClaim: onClaimComments
-                    )
-                    
-                    // Upload Progress
-                    DailyTaskRow(
-                        icon: "arrow.up.circle.fill",
-                        title: "Upload Workout",
-                        current: tasks.uploadsCount,
-                        max: DailyTasks.maxUploads,
-                        coinsPerAction: DailyTasks.coinsPerUpload,
-                        canClaim: tasks.canClaimUploads,
-                        isClaimed: tasks.uploadsClaimed,
-                        timeRemaining: tasks.uploadsTimeRemaining,
-                        isClaiming: isClaiming,
-                        onClaim: onClaimUploads
-                    )
-                    
-                    // Likes Progress
-                    DailyTaskRow(
-                        icon: "heart.fill",
-                        title: "Like Posts",
-                        current: tasks.likesCount,
-                        max: DailyTasks.maxLikes,
-                        coinsPerAction: DailyTasks.coinsPerLike,
-                        canClaim: tasks.canClaimLikes,
-                        isClaimed: tasks.likesClaimed,
-                        timeRemaining: tasks.likesTimeRemaining,
-                        isClaiming: isClaiming,
-                        onClaim: onClaimLikes
-                    )
+                    if let tasks = dailyTasks {
+                        // Comments Progress
+                        DailyTaskRow(
+                            icon: "bubble.left.fill",
+                            title: "Leave Comments",
+                            current: tasks.commentsCount,
+                            max: DailyTasks.maxComments,
+                            coinsPerAction: DailyTasks.coinsPerComment,
+                            canClaim: tasks.canClaimComments,
+                            isClaimed: tasks.commentsClaimed,
+                            timeRemaining: tasks.commentsTimeRemaining,
+                            isClaiming: isClaiming,
+                            onClaim: onClaimComments
+                        )
+                        
+                        // Upload Progress
+                        DailyTaskRow(
+                            icon: "arrow.up.circle.fill",
+                            title: "Upload Workout",
+                            current: tasks.uploadsCount,
+                            max: DailyTasks.maxUploads,
+                            coinsPerAction: DailyTasks.coinsPerUpload,
+                            canClaim: tasks.canClaimUploads,
+                            isClaimed: tasks.uploadsClaimed,
+                            timeRemaining: tasks.uploadsTimeRemaining,
+                            isClaiming: isClaiming,
+                            onClaim: onClaimUploads
+                        )
+                        
+                        // Likes Progress
+                        DailyTaskRow(
+                            icon: "heart.fill",
+                            title: "Like Posts",
+                            current: tasks.likesCount,
+                            max: DailyTasks.maxLikes,
+                            coinsPerAction: DailyTasks.coinsPerLike,
+                            canClaim: tasks.canClaimLikes,
+                            isClaimed: tasks.likesClaimed,
+                            timeRemaining: tasks.likesTimeRemaining,
+                            isClaiming: isClaiming,
+                            onClaim: onClaimLikes
+                        )
+                    } else {
+                        Text("Loading tasks...")
+                            .foregroundColor(.white.opacity(0.7))
+                            .font(.subheadline)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
-            } else {
-                Text("Loading tasks...")
-                    .foregroundColor(.white.opacity(0.7))
-                    .font(.subheadline)
+                .padding(.horizontal)
+                .padding(.bottom)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.white.opacity(0.1))
@@ -341,7 +456,6 @@ struct DailyTaskRow: View {
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
                     
-                    // TIMER RIGHT UNDER TITLE
                     if isClaimed && timeRemaining > 0 {
                         Text("⏱️ \(formattedTimeRemaining)")
                             .font(.caption)
@@ -432,11 +546,9 @@ struct DailyTaskRow: View {
             // Progress Bar
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    // Background
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color.white.opacity(0.2))
                     
-                    // Progress
                     RoundedRectangle(cornerRadius: 4)
                         .fill(
                             LinearGradient(
@@ -515,7 +627,7 @@ struct ShopItemCard: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Top section with icon and rarity
+            // Top section with image/icon and rarity
             ZStack(alignment: .topLeading) {
                 // Gradient background based on rarity
                 LinearGradient(
@@ -539,29 +651,70 @@ struct ShopItemCard: View {
                         Spacer()
                     }
                     .padding(8)
+                    .zIndex(1)
                 }
                 
-                // Icon in center
+                // Image or Icon in center
                 VStack {
                     Spacer()
-                    Image(systemName: item.iconName)
-                        .font(.system(size: 50, weight: .bold))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                    if let imageUrl = item.imageUrl, !imageUrl.isEmpty {
+                        AsyncImage(url: URL(string: imageUrl)) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .tint(.white)
+                                    .frame(width: 80, height: 80)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxWidth: 100, maxHeight: 100)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                            case .failure:
+                                Image(systemName: item.iconName)
+                                    .font(.system(size: 50, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                            @unknown default:
+                                Image(systemName: item.iconName)
+                                    .font(.system(size: 50, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                            }
+                        }
+                    } else {
+                        Image(systemName: item.iconName)
+                            .font(.system(size: 50, weight: .bold))
+                            .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                    }
                     Spacer()
                 }
             }
             
             // Bottom section with info
             VStack(alignment: .leading, spacing: 8) {
-                // Rarity and name
+                // Rarity (no purchase count for merchandise)
                 HStack {
-                    Text(item.rarity.rawValue.uppercased())
+                    Text(item.rarity.displayName.uppercased())
                         .font(.caption2)
                         .fontWeight(.black)
                         .foregroundColor(item.rarity.color)
                     
                     Spacer()
+                    
+                    // Only show purchase count for non-merchandise items
+                    if item.type != .merchandise && item.purchaseCount > 0 {
+                        HStack(spacing: 2) {
+                            Image(systemName: "cart.fill")
+                                .font(.caption2)
+                            Text("\(item.purchaseCount)")
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.white.opacity(0.6))
+                    }
                 }
                 
                 Text(item.name)
@@ -577,40 +730,96 @@ struct ShopItemCard: View {
                 
                 Spacer()
                 
-                // Purchase/Equip button
-                Button(action: onTap) {
-                    HStack {
-                        if isOwned {
-                            if isEquipped {
-                                Text("EQUIPPED")
-                                    .font(.caption)
-                                    .fontWeight(.black)
+                // Purchase/Equip button based on item type
+                if item.type == .merchandise {
+                    // Merchandise: Show "Previously Bought" if owned, else purchase button
+                    if isOwned {
+                        VStack(spacing: 6) {
+                            HStack {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.caption)
-                            } else {
-                                Text("EQUIP")
+                                    .foregroundColor(.green)
+                                Text("PREVIOUSLY BOUGHT")
+                                    .font(.caption2)
+                                    .fontWeight(.black)
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(8)
+                            
+                            // Purchase again button
+                            Button(action: onTap) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "star.fill")
+                                        .font(.caption2)
+                                    Text("\(item.price)")
+                                        .font(.caption)
+                                        .fontWeight(.black)
+                                    Text("• BUY AGAIN")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                }
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.white)
+                                .cornerRadius(8)
+                            }
+                        }
+                    } else {
+                        Button(action: onTap) {
+                            HStack {
+                                Image(systemName: "star.fill")
+                                    .font(.caption2)
+                                Text("\(item.price)")
                                     .font(.caption)
                                     .fontWeight(.black)
                             }
-                        } else {
-                            Image(systemName: "star.fill")
-                                .font(.caption2)
-                            Text("\(item.price)")
-                                .font(.caption)
-                                .fontWeight(.black)
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.white)
+                            .cornerRadius(8)
                         }
                     }
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(
-                        isEquipped ? Color.green :
-                        isOwned ? Color.cyan :
-                        Color.white
-                    )
-                    .cornerRadius(8)
+                } else {
+                    // Non-merchandise: Show equip/equipped
+                    Button(action: onTap) {
+                        HStack {
+                            if isOwned {
+                                if isEquipped {
+                                    Text("EQUIPPED")
+                                        .font(.caption)
+                                        .fontWeight(.black)
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.caption)
+                                } else {
+                                    Text("EQUIP")
+                                        .font(.caption)
+                                        .fontWeight(.black)
+                                }
+                            } else {
+                                Image(systemName: "star.fill")
+                                    .font(.caption2)
+                                Text("\(item.price)")
+                                    .font(.caption)
+                                    .fontWeight(.black)
+                            }
+                        }
+                        .foregroundColor(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(
+                            isEquipped ? Color.green :
+                            isOwned ? Color.cyan :
+                            Color.white
+                        )
+                        .cornerRadius(8)
+                    }
+                    .disabled(isEquipped)
                 }
-                .disabled(isEquipped)
             }
             .padding(12)
             .background(Color(red: 0.15, green: 0.17, blue: 0.25))
