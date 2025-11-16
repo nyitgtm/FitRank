@@ -262,6 +262,8 @@ struct ItemShopView: View {
             return viewModel.inventory.equippedBadgeId == item.id
         case .title:
             return viewModel.inventory.equippedTitleId == item.id
+        case .appicon:
+            return false
         case .merchandise:
             return false
         }

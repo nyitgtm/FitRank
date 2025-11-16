@@ -40,6 +40,7 @@ enum ShopItemType: String, Codable {
     case badge = "badge"
     case merchandise = "merchandise"
     case title = "title"
+    case appicon = "appicon"
     
     var displayName: String {
         switch self {
@@ -47,6 +48,7 @@ enum ShopItemType: String, Codable {
         case .badge: return "Badge"
         case .merchandise: return "Merch"
         case .title: return "Title"
+        case .appicon: return "App Icon"
         }
     }
 }
@@ -190,6 +192,8 @@ struct ShopItem: Identifiable, Codable {
             } else {
                 return "person.fill"
             }
+        case .appicon:
+            return "app.badge.fill"
         }
     }
 }

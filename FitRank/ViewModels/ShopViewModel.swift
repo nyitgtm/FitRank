@@ -87,7 +87,7 @@ class ShopViewModel: ObservableObject {
                 let availableUntil = (data["availableUntil"] as? Timestamp)?.dateValue()
                 
                 let item = ShopItem(
-                    id: document.documentID, // Use Firestore document ID
+                    id: document.documentID,
                     name: name,
                     description: description,
                     price: price,
@@ -193,7 +193,7 @@ class ShopViewModel: ObservableObject {
                 
                 // 3. Record purchase in user's purchases subcollection
                 // For merchandise, use a unique document ID with timestamp
-                let purchaseDocId = item.type == .merchandise ? 
+                let purchaseDocId = item.type == .merchandise ?
                     "\(item.id)_\(Int(Date().timeIntervalSince1970))" : item.id
                 
                 let purchaseRef = db.collection("users").document(userId).collection("purchases").document(purchaseDocId)
@@ -221,7 +221,7 @@ class ShopViewModel: ObservableObject {
                     saveLocalPurchase(item.id)
                 }
                 
-                // Auto-equip if it's the first of its type (not for merchandise)
+                // Auto-equip or apply the item
                 if item.type != .merchandise {
                     switch item.category {
                     case .theme:
@@ -235,6 +235,11 @@ class ShopViewModel: ObservableObject {
                     case .title:
                         if inventory.equippedTitleId == nil {
                             await equipItem(item)
+                        }
+                    case .appicon:
+                        // Immediately apply the app icon
+                        if let appIcon = item.appIcon {
+                            AppIconManager.shared.setIcon(appIcon)
                         }
                     case .merchandise:
                         break
@@ -281,6 +286,11 @@ class ShopViewModel: ObservableObject {
                 "equippedTitleId": item.id
             ])
             print("✅ Equipped title: \(item.name)")
+        case .appicon:
+            // Apply the app icon
+            if let appIcon = item.appIcon {
+                AppIconManager.shared.setIcon(appIcon)
+            }
         case .merchandise:
             break
         }
