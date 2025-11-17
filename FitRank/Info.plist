@@ -33,6 +33,24 @@
 					<string>AppIcon-Platinum</string>
 				</array>
 			</dict>
+			<key>AppIcon-Diamond</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Diamond</string>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>AppIcon-Diamond</string>
+				</array>
+			</dict>
+			<key>AppIcon-Limited</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Limited</string>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>AppIcon-Limited</string>
+				</array>
+			</dict>
 			<!-- Add others similarly -->
 		</dict>
 	</dict>

@@ -128,6 +128,7 @@ class AppIconManager: ObservableObject {
 extension ShopItem {
     var appIcon: AppIconManager.AppIcon? {
         // Map shop item IDs to app icons
+        print("🔍 Mapping shop item ID: \(self.id) to app icon")
         switch self.id {
         case "appicon_gold":
             return .gold
@@ -138,6 +139,7 @@ extension ShopItem {
         case "appicon_limited":
             return .limited
         default:
+            print("⚠️ No app icon mapping found for ID: \(self.id), defaulting to primary")
             return .primary
         }
     }

@@ -265,6 +265,8 @@ class ShopViewModel: ObservableObject {
         guard inventory.ownedItemIds.contains(item.id) else { return }
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
+        print("🎯 Equipping item: \(item.name) (ID: \(item.id), Type: \(item.category.rawValue))")
+        
         switch item.category {
         case .theme:
             inventory.equippedThemeId = item.id
@@ -287,7 +289,10 @@ class ShopViewModel: ObservableObject {
         case .appicon:
             // Apply the app icon
             if let appIcon = item.appIcon {
+                print("📱 Applying app icon: \(appIcon.displayName) (rawValue: \(appIcon.rawValue))")
                 AppIconManager.shared.setIcon(appIcon)
+            } else {
+                print("❌ Failed to get app icon from item")
             }
         case .merchandise:
             break
