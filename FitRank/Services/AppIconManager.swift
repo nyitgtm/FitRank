@@ -83,7 +83,6 @@ class AppIconManager: ObservableObject {
                     self.currentIcon = icon
                     self.saveCurrentIcon(icon)
                     print("✅ App icon changed to: \(icon.displayName)")
-                    AppIconManager.shared.resetToPrimaryIcon()
                 }
             }
         }

@@ -238,9 +238,7 @@ class ShopViewModel: ObservableObject {
                         }
                     case .appicon:
                         // Immediately apply the app icon
-                        if let appIcon = item.appIcon {
-                            AppIconManager.shared.setIcon(appIcon)
-                        }
+                        await equipItem(item)
                     case .merchandise:
                         break
                     }
