@@ -15,6 +15,7 @@ enum ClaimType {
 enum ShopCategory: String, CaseIterable {
     case all = "All"
     case themes = "Themes"
+    case appicons = "App Icons"
     case merchandise = "Merch"
     case badges = "Badges"
     case titles = "Titles"
@@ -40,6 +41,8 @@ struct ItemShopView: View {
             return viewModel.shopItems
         case .themes:
             return viewModel.shopItems.filter { $0.type == .theme }
+        case .appicons:
+            return viewModel.shopItems.filter { $0.type == .appicon }
         case .merchandise:
             return viewModel.shopItems.filter { $0.type == .merchandise }
         case .badges:
