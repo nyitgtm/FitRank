@@ -36,7 +36,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationView {
+        
             VStack(spacing: 0) {
                 // Custom FitRank Header
                 FitRankHeaderView()
@@ -206,7 +206,7 @@ struct HomeView: View {
                     }
                 }
             }
-        }
+        
         .sheet(isPresented: $showingUpload) { UploadView() }
         .sheet(isPresented: $showingLeaderboard) { LeaderboardView() }
         .sheet(isPresented: $showingUserSearch) {
