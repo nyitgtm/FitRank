@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+			<key>CFBundleIconFiles</key>
+			<array>
+				<string>AppIcon</string>
+			</array>
+		</dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>AppIcon-Gold</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Gold</string>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>AppIcon-Gold</string>
+				</array>
+			</dict>
+			<key>AppIcon-Platinum</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Platinum</string>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>AppIcon-Platinum</string>
+				</array>
+			</dict>
+			<key>AppIcon-Diamond</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Diamond</string>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>AppIcon-Diamond</string>
+				</array>
+			</dict>
+			<key>AppIcon-Limited</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Limited</string>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>AppIcon-Limited</string>
+				</array>
+			</dict>
+			<!-- Add others similarly -->
+		</dict>
+	</dict>
+</dict>
+</plist>

@@ -15,6 +15,7 @@ enum ClaimType {
 enum ShopCategory: String, CaseIterable {
     case all = "All"
     case themes = "Themes"
+    case appicons = "App Icons"
     case merchandise = "Merch"
     case badges = "Badges"
     case titles = "Titles"
@@ -40,6 +41,8 @@ struct ItemShopView: View {
             return viewModel.shopItems
         case .themes:
             return viewModel.shopItems.filter { $0.type == .theme }
+        case .appicons:
+            return viewModel.shopItems.filter { $0.type == .appicon }
         case .merchandise:
             return viewModel.shopItems.filter { $0.type == .merchandise }
         case .badges:
@@ -68,6 +71,33 @@ struct ItemShopView: View {
                         // Token balance header
                         TokenBalanceHeader(tokens: viewModel.inventory.tokens)
                             .padding(.horizontal)
+                        
+                        // Reset Icon Button (only show if not on primary)
+                        if AppIconManager.shared.currentIcon != .primary {
+                            Button(action: {
+                                AppIconManager.shared.resetToPrimaryIcon()
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.counterclockwise")
+                                        .font(.subheadline)
+                                    Text("Reset to Classic Icon")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.orange.opacity(0.3))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(Color.orange, lineWidth: 1)
+                                        )
+                                )
+                            }
+                            .padding(.horizontal)
+                        }
                         
                         // Daily Tasks Section
                         DailyTasksCard(
@@ -262,6 +292,12 @@ struct ItemShopView: View {
             return viewModel.inventory.equippedBadgeId == item.id
         case .title:
             return viewModel.inventory.equippedTitleId == item.id
+        case .appicon:
+            // Check if current app icon matches this item's icon
+            if let appIcon = item.appIcon {
+                return AppIconManager.shared.currentIcon == appIcon
+            }
+            return false
         case .merchandise:
             return false
         }
@@ -656,7 +692,6 @@ struct ShopItemCard: View {
                 
                 // Image or Icon in center
                 VStack {
-                    Spacer()
                     if let imageUrl = item.imageUrl, !imageUrl.isEmpty {
                         AsyncImage(url: URL(string: imageUrl)) { phase in
                             switch phase {
@@ -689,8 +724,8 @@ struct ShopItemCard: View {
                             .foregroundColor(.white)
                             .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
                     }
-                    Spacer()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             
             // Bottom section with info
@@ -819,6 +854,7 @@ struct ShopItemCard: View {
                         .cornerRadius(8)
                     }
                     .disabled(isEquipped)
+                    .opacity(isEquipped ? 0.7 : 1.0)
                 }
             }
             .padding(12)
