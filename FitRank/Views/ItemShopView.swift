@@ -69,6 +69,33 @@ struct ItemShopView: View {
                         TokenBalanceHeader(tokens: viewModel.inventory.tokens)
                             .padding(.horizontal)
                         
+                        // Reset Icon Button (only show if not on primary)
+                        if AppIconManager.shared.currentIcon != .primary {
+                            Button(action: {
+                                AppIconManager.shared.resetToPrimaryIcon()
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.counterclockwise")
+                                        .font(.subheadline)
+                                    Text("Reset to Classic Icon")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.orange.opacity(0.3))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(Color.orange, lineWidth: 1)
+                                        )
+                                )
+                            }
+                            .padding(.horizontal)
+                        }
+                        
                         // Daily Tasks Section
                         DailyTasksCard(
                             dailyTasks: dailyTasks,
@@ -263,6 +290,10 @@ struct ItemShopView: View {
         case .title:
             return viewModel.inventory.equippedTitleId == item.id
         case .appicon:
+            // Check if current app icon matches this item's icon
+            if let appIcon = item.appIcon {
+                return AppIconManager.shared.currentIcon == appIcon
+            }
             return false
         case .merchandise:
             return false
@@ -821,6 +852,7 @@ struct ShopItemCard: View {
                         .cornerRadius(8)
                     }
                     .disabled(isEquipped)
+                    .opacity(isEquipped ? 0.7 : 1.0)
                 }
             }
             .padding(12)
