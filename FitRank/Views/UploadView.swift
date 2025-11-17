@@ -145,11 +145,12 @@ struct UploadView: View {
                         )
                     }
                     .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 4)
                 }
                 .background(Color(.systemGroupedBackground))
                 .navigationTitle("Upload Workout")
-                .navigationBarTitleDisplayMode(.large)
+                .navigationBarTitleDisplayMode(.inline)
                 .onDisappear {
                     resetForm()
                 }
