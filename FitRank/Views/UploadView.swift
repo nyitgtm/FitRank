@@ -150,14 +150,6 @@ struct UploadView: View {
                 .background(Color(.systemGroupedBackground))
                 .navigationTitle("Upload Workout")
                 .navigationBarTitleDisplayMode(.large)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") {
-                            resetForm()
-                            dismiss()
-                        }
-                    }
-                }
                 .onDisappear {
                     resetForm()
                 }
