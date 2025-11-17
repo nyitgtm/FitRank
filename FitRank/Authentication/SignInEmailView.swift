@@ -14,6 +14,9 @@ final class SignInEmailViewModel: ObservableObject {
     @Published var isSignedIn = false
     @Published var errorMessage: String?
     @Published var isLoading = false
+    @Published var showResetPassword = false
+    @Published var resetEmail = ""
+    @Published var resetSuccessMessage: String?
     
     func signIn() {
         guard !email.isEmpty, !password.isEmpty else {
@@ -32,6 +35,34 @@ final class SignInEmailViewModel: ObservableObject {
             } catch {
                 print("Sign-in error: \(error)")
                 errorMessage = "Sign-in failed. Please check your credentials."
+            }
+            
+            isLoading = false
+        }
+    }
+    
+    func resetPassword() {
+        guard !resetEmail.isEmpty else {
+            errorMessage = "Please enter your email address."
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        resetSuccessMessage = nil
+        
+        Task {
+            do {
+                try await AuthenticationManager.shared.resetPassword(email: resetEmail)
+                resetSuccessMessage = "Password reset email sent! Check your inbox."
+                // Wait 2 seconds then close the sheet
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+                showResetPassword = false
+                resetEmail = ""
+                resetSuccessMessage = nil
+            } catch {
+                print("Reset password error: \(error)")
+                errorMessage = "Failed to send reset email. Please check your email address."
             }
             
             isLoading = false
@@ -94,6 +125,16 @@ struct SignInEmailView: View {
                             .multilineTextAlignment(.center)
                     }
                     
+                    // Forgot Password Button
+                    Button(action: {
+                        viewModel.showResetPassword = true
+                    }) {
+                        Text("Forgot Password?")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.top, -8)
+                    
                     Button(action: {
                         viewModel.signIn()
                     }) {
@@ -139,6 +180,9 @@ struct SignInEmailView: View {
                 SignUpEmailView(showSignInView: $showSignInView)
             }
         }
+        .sheet(isPresented: $viewModel.showResetPassword) {
+            ResetPasswordView(viewModel: viewModel)
+        }
         .onChange(of: viewModel.isSignedIn) { _, isSignedIn in
             if isSignedIn {
                 showSignInView = false
@@ -151,4 +195,107 @@ struct SignInEmailView: View {
 
 #Preview {
     SignInEmailView(showSignInView: .constant(false))
+}
+
+// MARK: - Reset Password View
+struct ResetPasswordView: View {
+    @ObservedObject var viewModel: SignInEmailViewModel
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                // Header
+                VStack(spacing: 8) {
+                    Image(systemName: "lock.rotation")
+                        .font(.system(size: 60))
+                        .foregroundColor(.blue)
+                    
+                    Text("Reset Password")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                    
+                    Text("Enter your email address and we'll send you instructions to reset your password")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding(.top, 40)
+                
+                // Form
+                VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Email")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        TextField("Enter your email", text: $viewModel.resetEmail)
+                            .textFieldStyle(ModernTextFieldStyle())
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .autocapitalization(.none)
+                    }
+                    
+                    if let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                            .padding(.horizontal)
+                            .multilineTextAlignment(.center)
+                    }
+                    
+                    if let successMessage = viewModel.resetSuccessMessage {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text(successMessage)
+                                .foregroundColor(.green)
+                                .font(.subheadline)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.green.opacity(0.1))
+                        )
+                    }
+                    
+                    Button(action: {
+                        viewModel.resetPassword()
+                    }) {
+                        HStack {
+                            if viewModel.isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Text("Send Reset Email")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(viewModel.isLoading)
+                }
+                .padding(.horizontal)
+                
+                Spacer()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.blue)
+                }
+            }
+        }
+    }
 }
