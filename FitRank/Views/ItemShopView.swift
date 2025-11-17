@@ -692,7 +692,6 @@ struct ShopItemCard: View {
                 
                 // Image or Icon in center
                 VStack {
-                    Spacer()
                     if let imageUrl = item.imageUrl, !imageUrl.isEmpty {
                         AsyncImage(url: URL(string: imageUrl)) { phase in
                             switch phase {
@@ -725,8 +724,8 @@ struct ShopItemCard: View {
                             .foregroundColor(.white)
                             .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
                     }
-                    Spacer()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             
             // Bottom section with info
