@@ -158,7 +158,12 @@ struct UploadView: View {
             }
         }
         .sheet(isPresented: $showingCamera) {
-            CameraView(videoURL: $videoURL)
+            CameraRecorder(
+                videoURL: $videoURL,
+                showError: $showError,
+                errorMessage: $errorMessage
+            )
+            .ignoresSafeArea()
         }
         .sheet(isPresented: $showingVideoPicker) {
             VideoPicker(

@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>FitRank needs access to your camera to record workout videos.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>FitRank needs access to your microphone to record audio with your workout videos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FitRank needs access to your photo library to select workout videos.</string>
 	<key>CFBundleIcons</key>
 	<dict>
 		<key>CFBundlePrimaryIcon</key>
