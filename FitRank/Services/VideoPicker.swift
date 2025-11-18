@@ -99,12 +99,90 @@ struct VideoPicker: UIViewControllerRepresentable {
                     try? FileManager.default.removeItem(at: url)
                 } else {
                     self.parent.videoURL = url
+                    
+                    // Try to extract location from video metadata
+                    await self.extractLocationFromVideo(url: url)
                 }
             } catch {
                 self.parent.errorMessage = "Failed to validate video: \(error.localizedDescription)"
                 self.parent.showError = true
                 try? FileManager.default.removeItem(at: url)
             }
+        }
+        
+        @MainActor
+        private func extractLocationFromVideo(url: URL) async {
+            let asset = AVAsset(url: url)
+            
+            do {
+                // Get metadata from video
+                let metadata = try await asset.load(.metadata)
+                
+                for item in metadata {
+                    // Look for location metadata
+                    if let keyString = item.commonKey?.rawValue,
+                       keyString.contains("location") || keyString.contains("GPS") {
+                        
+                        if let locationData = try? await item.load(.value) as? String {
+                            // Parse location string (format varies)
+                            print("Found location metadata: \(locationData)")
+                        }
+                    }
+                    
+                    // iOS specific location key
+                    if item.identifier?.rawValue.contains("location") == true,
+                       let locationString = try? await item.load(.stringValue) {
+                        print("Found iOS location: \(locationString)")
+                        // Parse ISO 6709 format location string
+                        if let location = self.parseISO6709Location(locationString) {
+                            NotificationCenter.default.post(
+                                name: NSNotification.Name("VideoLocationFound"),
+                                object: location
+                            )
+                        }
+                    }
+                }
+                
+                // Also check common metadata
+                let commonMetadata = try await asset.load(.commonMetadata)
+                for item in commonMetadata {
+                    if item.commonKey == .commonKeyLocation,
+                       let locationString = try? await item.load(.stringValue) {
+                        print("Found common location: \(locationString)")
+                        if let location = self.parseISO6709Location(locationString) {
+                            NotificationCenter.default.post(
+                                name: NSNotification.Name("VideoLocationFound"),
+                                object: location
+                            )
+                        }
+                    }
+                }
+            } catch {
+                print("Could not extract location from video: \(error)")
+            }
+        }
+        
+        private func parseISO6709Location(_ locationString: String) -> CLLocation? {
+            // ISO 6709 format: +40.7484-073.9857/ or similar
+            // Remove any trailing slashes
+            let cleaned = locationString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            
+            // Simple regex to extract lat/lon
+            let pattern = "([+-]?\\d+\\.\\d+)([+-]\\d+\\.\\d+)"
+            guard let regex = try? NSRegularExpression(pattern: pattern),
+                  let match = regex.firstMatch(in: cleaned, range: NSRange(cleaned.startIndex..., in: cleaned)) else {
+                return nil
+            }
+            
+            guard match.numberOfRanges >= 3,
+                  let latRange = Range(match.range(at: 1), in: cleaned),
+                  let lonRange = Range(match.range(at: 2), in: cleaned),
+                  let latitude = Double(cleaned[latRange]),
+                  let longitude = Double(cleaned[lonRange]) else {
+                return nil
+            }
+            
+            return CLLocation(latitude: latitude, longitude: longitude)
         }
     }
 }

@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import FirebaseAuth
+import CoreLocation
 
 struct UploadView: View {
     @Environment(\.dismiss) private var dismiss
@@ -104,13 +105,19 @@ struct UploadView: View {
         }
         
         // Find closest gym by distance
-        let gymsWithDistance = gymRepository.gyms.compactMap { gym -> (gym: Gym, distance: Double)? in
-            guard let gymId = gym.id else { return nil }
-            let distance = userLocation.distance(from: gym.location.coordinate)
-            return (gym, distance)
+        var closestGymData: (gym: Gym, distance: Double)? = nil
+        
+        for gym in gymRepository.gyms {
+            guard let gymId = gym.id else { continue }
+            let gymCoordinate = gym.location.coordinate
+            let distance = userLocation.distance(from: gymCoordinate)
+            
+            if closestGymData == nil || distance < closestGymData!.distance {
+                closestGymData = (gym, distance)
+            }
         }
         
-        guard let closest = gymsWithDistance.min(by: { $0.distance < $1.distance }) else {
+        guard let closest = closestGymData else {
             return nil
         }
         
@@ -224,6 +231,24 @@ struct UploadView: View {
             // When location updates and we don't have a selection, pick closest
             if selectedGym == nil, newLocation != nil, let closest = closestGym {
                 selectedGym = closest.id
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("VideoLocationFound"))) { notification in
+            // When video location is found, find closest gym to that location
+            if let videoLocation = notification.object as? CLLocation {
+                print("Video recorded at: \(videoLocation.coordinate.latitude), \(videoLocation.coordinate.longitude)")
+                
+                // Find closest gym to video location
+                let gymsWithDistance = gymRepository.gyms.compactMap { gym -> (gym: Gym, distance: Double)? in
+                    guard let gymId = gym.id else { return nil }
+                    let distance = videoLocation.distance(from: gym.location.coordinate)
+                    return (gym, distance)
+                }
+                
+                if let closest = gymsWithDistance.min(by: { $0.distance < $1.distance }) {
+                    selectedGym = closest.gym.id
+                    print("Selected closest gym: \(closest.gym.name) (\(Int(closest.distance))m away)")
+                }
             }
         }
     }
