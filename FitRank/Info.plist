@@ -8,6 +8,8 @@
 	<string>FitRank needs access to your microphone to record audio with your workout videos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>FitRank needs access to your photo library to select workout videos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>FitRank needs your location to find the closest gym to you.</string>
 	<key>CFBundleIcons</key>
 	<dict>
 		<key>CFBundlePrimaryIcon</key>

@@ -8,6 +8,7 @@ struct UploadView: View {
     @StateObject private var userViewModel = UserViewModel()
     @StateObject private var gymRepository = GymRepository()
     @StateObject private var videoUploadService = VideoUploadService()
+    @StateObject private var locationManager = FitRankLocationManager()
     
     @State private var videoURL: URL?
     @State private var selectedLiftType: LiftType = .bench
@@ -94,11 +95,26 @@ struct UploadView: View {
     }
     
     private var closestGym: (name: String, id: String)? {
-        // For now, return first gym. You can implement distance calculation here
-        if let firstGym = gymRepository.gyms.first {
-            return (name: firstGym.name, id: firstGym.id ?? "")
+        guard let userLocation = locationManager.lastLocation else {
+            // If no location, return first gym as fallback
+            if let firstGym = gymRepository.gyms.first {
+                return (name: firstGym.name, id: firstGym.id ?? "")
+            }
+            return nil
         }
-        return nil
+        
+        // Find closest gym by distance
+        let gymsWithDistance = gymRepository.gyms.compactMap { gym -> (gym: Gym, distance: Double)? in
+            guard let gymId = gym.id else { return nil }
+            let distance = userLocation.distance(from: gym.location.coordinate)
+            return (gym, distance)
+        }
+        
+        guard let closest = gymsWithDistance.min(by: { $0.distance < $1.distance }) else {
+            return nil
+        }
+        
+        return (name: closest.gym.name, id: closest.gym.id ?? "")
     }
     
     var body: some View {
@@ -192,8 +208,21 @@ struct UploadView: View {
         }
         .task {
             await gymRepository.fetchGyms()
-            // Set closest gym as default
-            if let closest = closestGym {
+            // Wait a moment for gyms to load, then set closest gym
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if selectedGym == nil, let closest = closestGym {
+                selectedGym = closest.id
+            }
+        }
+        .onChange(of: gymRepository.gyms) { _, newGyms in
+            // When gyms finish loading and we don't have a selection, pick closest
+            if selectedGym == nil, !newGyms.isEmpty, let closest = closestGym {
+                selectedGym = closest.id
+            }
+        }
+        .onChange(of: locationManager.lastLocation) { _, newLocation in
+            // When location updates and we don't have a selection, pick closest
+            if selectedGym == nil, newLocation != nil, let closest = closestGym {
                 selectedGym = closest.id
             }
         }
