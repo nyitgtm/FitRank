@@ -6,6 +6,18 @@ struct TabContainerView: View {
     @State private var selectedTab: Tab = .home
 
     enum Tab: Hashable { case home, community, upload, nutrition, profile }
+    
+    init(showSignInView: Binding<Bool>) {
+        self._showSignInView = showSignInView
+        
+        // Configure tab bar appearance to always have white background
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .systemBackground
+        
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
