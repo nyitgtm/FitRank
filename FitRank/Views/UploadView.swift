@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import FirebaseAuth
+import CoreLocation
 
 struct UploadView: View {
     @Environment(\.dismiss) private var dismiss
@@ -8,6 +9,7 @@ struct UploadView: View {
     @StateObject private var userViewModel = UserViewModel()
     @StateObject private var gymRepository = GymRepository()
     @StateObject private var videoUploadService = VideoUploadService()
+    @StateObject private var locationManager = FitRankLocationManager()
     
     @State private var videoURL: URL?
     @State private var selectedLiftType: LiftType = .bench
@@ -52,6 +54,39 @@ struct UploadView: View {
         return barbellWeight + Int(round(platesPerSide * 2)) // Both sides
     }
     
+    private func calculatePlatesFromWeight(_ totalWeight: Int) -> (plate45: Int, plate25: Int, plate10: Int, plate5: Int, plate2_5: Int) {
+        let barbellWeight = 45
+        let targetWeight = totalWeight - barbellWeight
+        
+        // If negative or zero, return zeros
+        guard targetWeight > 0 else {
+            return (0, 0, 0, 0, 0)
+        }
+        
+        // Weight per side
+        var remainingPerSide = Double(targetWeight) / 2.0
+        
+        var p45 = 0, p25 = 0, p10 = 0, p5 = 0, p2_5 = 0
+        
+        // Greedy algorithm - use largest plates first
+        p45 = Int(remainingPerSide / 45.0)
+        remainingPerSide -= Double(p45) * 45.0
+        
+        p25 = Int(remainingPerSide / 25.0)
+        remainingPerSide -= Double(p25) * 25.0
+        
+        p10 = Int(remainingPerSide / 10.0)
+        remainingPerSide -= Double(p10) * 10.0
+        
+        p5 = Int(remainingPerSide / 5.0)
+        remainingPerSide -= Double(p5) * 5.0
+        
+        // Round to nearest 2.5 increment
+        p2_5 = Int(round(remainingPerSide / 2.5))
+        
+        return (p45, p25, p10, p5, p2_5)
+    }
+    
     private var totalPlatesPerSide: Int {
         return plate45Count + plate25Count + plate10Count + plate5Count + plate2_5Count
     }
@@ -61,11 +96,32 @@ struct UploadView: View {
     }
     
     private var closestGym: (name: String, id: String)? {
-        // For now, return first gym. You can implement distance calculation here
-        if let firstGym = gymRepository.gyms.first {
-            return (name: firstGym.name, id: firstGym.id ?? "")
+        guard let userLocation = locationManager.lastLocation else {
+            // If no location, return first gym as fallback
+            if let firstGym = gymRepository.gyms.first {
+                return (name: firstGym.name, id: firstGym.id ?? "")
+            }
+            return nil
         }
-        return nil
+        
+        // Find closest gym by distance
+        var closestGymData: (gym: Gym, distance: Double)? = nil
+        
+        for gym in gymRepository.gyms {
+            guard let gymId = gym.id else { continue }
+            let gymCoordinate = gym.location.coordinate
+            let distance = userLocation.distance(from: gymCoordinate)
+            
+            if closestGymData == nil || distance < closestGymData!.distance {
+                closestGymData = (gym, distance)
+            }
+        }
+        
+        guard let closest = closestGymData else {
+            return nil
+        }
+        
+        return (name: closest.gym.name, id: closest.gym.id ?? "")
     }
     
     var body: some View {
@@ -112,19 +168,12 @@ struct UploadView: View {
                         )
                     }
                     .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 4)
                 }
                 .background(Color(.systemGroupedBackground))
                 .navigationTitle("Upload Workout")
-                .navigationBarTitleDisplayMode(.large)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") {
-                            resetForm()
-                            dismiss()
-                        }
-                    }
-                }
+                .navigationBarTitleDisplayMode(.inline)
                 .onDisappear {
                     resetForm()
                 }
@@ -132,7 +181,12 @@ struct UploadView: View {
             }
         }
         .sheet(isPresented: $showingCamera) {
-            CameraView(videoURL: $videoURL)
+            CameraRecorder(
+                videoURL: $videoURL,
+                showError: $showError,
+                errorMessage: $errorMessage
+            )
+            .ignoresSafeArea()
         }
         .sheet(isPresented: $showingVideoPicker) {
             VideoPicker(
@@ -161,9 +215,40 @@ struct UploadView: View {
         }
         .task {
             await gymRepository.fetchGyms()
-            // Set closest gym as default
-            if let closest = closestGym {
+            // Wait a moment for gyms to load, then set closest gym
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if selectedGym == nil, let closest = closestGym {
                 selectedGym = closest.id
+            }
+        }
+        .onChange(of: gymRepository.gyms) { _, newGyms in
+            // When gyms finish loading and we don't have a selection, pick closest
+            if selectedGym == nil, !newGyms.isEmpty, let closest = closestGym {
+                selectedGym = closest.id
+            }
+        }
+        .onChange(of: locationManager.lastLocation) { _, newLocation in
+            // When location updates and we don't have a selection, pick closest
+            if selectedGym == nil, newLocation != nil, let closest = closestGym {
+                selectedGym = closest.id
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("VideoLocationFound"))) { notification in
+            // When video location is found, find closest gym to that location
+            if let videoLocation = notification.object as? CLLocation {
+                print("Video recorded at: \(videoLocation.coordinate.latitude), \(videoLocation.coordinate.longitude)")
+                
+                // Find closest gym to video location
+                let gymsWithDistance = gymRepository.gyms.compactMap { gym -> (gym: Gym, distance: Double)? in
+                    guard let gymId = gym.id else { return nil }
+                    let distance = videoLocation.distance(from: gym.location.coordinate)
+                    return (gym, distance)
+                }
+                
+                if let closest = gymsWithDistance.min(by: { $0.distance < $1.distance }) {
+                    selectedGym = closest.gym.id
+                    print("Selected closest gym: \(closest.gym.name) (\(Int(closest.distance))m away)")
+                }
             }
         }
     }
@@ -358,6 +443,45 @@ struct WeightPlateCalculator: View {
     
     private let maxPlatesForVisualization = 9 // 9 per side = 18 total
     
+    // Calculate plates from manual weight
+    private var calculatedPlates: (plate45: Int, plate25: Int, plate10: Int, plate5: Int, plate2_5: Int) {
+        guard let weight = Int(manualWeight), weight > 0 else {
+            return (0, 0, 0, 0, 0)
+        }
+        
+        let barbellWeight = 45
+        let targetWeight = weight - barbellWeight
+        
+        guard targetWeight > 0 else {
+            return (0, 0, 0, 0, 0)
+        }
+        
+        var remainingPerSide = Double(targetWeight) / 2.0
+        
+        var p45 = 0, p25 = 0, p10 = 0, p5 = 0, p2_5 = 0
+        
+        p45 = Int(remainingPerSide / 45.0)
+        remainingPerSide -= Double(p45) * 45.0
+        
+        p25 = Int(remainingPerSide / 25.0)
+        remainingPerSide -= Double(p25) * 25.0
+        
+        p10 = Int(remainingPerSide / 10.0)
+        remainingPerSide -= Double(p10) * 10.0
+        
+        p5 = Int(remainingPerSide / 5.0)
+        remainingPerSide -= Double(p5) * 5.0
+        
+        p2_5 = Int(round(remainingPerSide / 2.5))
+        
+        return (p45, p25, p10, p5, p2_5)
+    }
+    
+    private var calculatedTotalPlatesPerSide: Int {
+        let plates = calculatedPlates
+        return plates.plate45 + plates.plate25 + plates.plate10 + plates.plate5 + plates.plate2_5
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             // Header with total weight and toggle
@@ -408,6 +532,50 @@ struct WeightPlateCalculator: View {
                     Text("lbs")
                         .font(.title3)
                         .foregroundColor(.secondary)
+                    
+                    // Show calculated plate breakdown
+                    if totalWeight > 45, calculatedTotalPlatesPerSide <= maxPlatesForVisualization {
+                        VStack(spacing: 12) {
+                            Text("Plate Breakdown:")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                            
+                            BarbellVisualization(
+                                plate45: calculatedPlates.plate45,
+                                plate25: calculatedPlates.plate25,
+                                plate10: calculatedPlates.plate10,
+                                plate5: calculatedPlates.plate5,
+                                plate2_5: calculatedPlates.plate2_5
+                            )
+                            
+                            // Show plate counts
+                            HStack(spacing: 16) {
+                                if calculatedPlates.plate45 > 0 {
+                                    PlateCountBadge(count: calculatedPlates.plate45, weight: 45, color: .red)
+                                }
+                                if calculatedPlates.plate25 > 0 {
+                                    PlateCountBadge(count: calculatedPlates.plate25, weight: 25, color: .green)
+                                }
+                                if calculatedPlates.plate10 > 0 {
+                                    PlateCountBadge(count: calculatedPlates.plate10, weight: 10, color: .blue)
+                                }
+                                if calculatedPlates.plate5 > 0 {
+                                    PlateCountBadge(count: calculatedPlates.plate5, weight: 5, color: .orange)
+                                }
+                                if calculatedPlates.plate2_5 > 0 {
+                                    PlateCountBadge(count: calculatedPlates.plate2_5, weight: 2.5, color: .gray)
+                                }
+                            }
+                            .font(.caption)
+                        }
+                        .padding(.top, 8)
+                    } else if totalWeight > 45 && calculatedTotalPlatesPerSide > maxPlatesForVisualization {
+                        Text("Too many plates to visualize (\(calculatedTotalPlatesPerSide) per side)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 8)
+                    }
                 }
                 .padding(.vertical, 20)
             } else {
@@ -967,4 +1135,30 @@ struct VideoPickerView: View {
 
 #Preview {
     UploadView()
+}
+
+// MARK: - Plate Count Badge
+struct PlateCountBadge: View {
+    let count: Int
+    let weight: Double
+    let color: Color
+    
+    private var weightText: String {
+        if weight.truncatingRemainder(dividingBy: 1) == 0 {
+            return "\(Int(weight))"
+        } else {
+            return String(format: "%.1f", weight)
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 12, height: 12)
+            Text("\(count)×\(weightText)")
+                .fontWeight(.semibold)
+        }
+        .foregroundColor(.secondary)
+    }
 }
