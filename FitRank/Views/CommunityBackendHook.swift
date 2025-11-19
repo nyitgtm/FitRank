@@ -155,16 +155,39 @@ final class CommunityService {
             .addSnapshotListener { snap, _ in
                 let items: [CommunityFeedItem] = (snap?.documents ?? []).compactMap { doc in
                     let data = doc.data()
+                    
+                    // Debug: Check what createdAt value we're getting
+                    if let timestamp = data["createdAt"] as? Timestamp {
+                        let date = timestamp.dateValue()
+                        print("📅 Post \(doc.documentID): createdAt = \(date)")
+                    } else {
+                        print("⚠️ Post \(doc.documentID): createdAt is nil!")
+                    }
+                    
+                    // Try to get createdAt from document data
+                    let createdAt: Date
+                    if let timestamp = data["createdAt"] as? Timestamp {
+                        createdAt = timestamp.dateValue()
+                    } else if doc.metadata.hasPendingWrites {
+                        // Brand new document being written
+                        createdAt = Date()
+                        print("🆕 Using current time for pending document")
+                    } else {
+                        // Existing document without timestamp - use fallback
+                        createdAt = Date()
+                        print("⚠️ Using fallback Date() for existing document without timestamp")
+                    }
+                    
                     return CommunityFeedItem(
                         id: doc.documentID,
-                        authorId: data["authorId"] as? String ?? "",         // ✅
+                        authorId: data["authorId"] as? String ?? "",
                         authorName: data["authorName"] as? String ?? "User",
                         teamTag: data["teamTag"] as? String,
                         text: data["text"] as? String ?? "",
                         imageURLString: data["imageURL"] as? String,
                         likeCount: data["likeCount"] as? Int ?? 0,
                         commentCount: data["commentCount"] as? Int ?? 0,
-                        createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+                        createdAt: createdAt
                     )
                 }
                 onChange(items)
