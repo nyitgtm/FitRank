@@ -81,6 +81,8 @@ struct Heatmap: View {
     @State private var currentZoomLevel: Double = 0.05 // Track zoom level
     @State private var selectedGym: Gym? // Track selected gym for detail view
     @State private var showGymDetail = false // Control sheet presentation
+    @State private var preloadingViewModel: GymDetailViewModel? = nil
+    @State private var isPreloading: Bool = false
     
     // Computed property to check if map is zoomed in enough to show team labels
     private var isZoomedIn: Bool {
@@ -157,6 +159,22 @@ struct Heatmap: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             mapView
+            // Preload overlay shown while fetching gym details
+            if isPreloading {
+                Color(.systemBackground)
+                    .opacity(0.85)
+                    .edgesIgnoringSafeArea(.all)
+
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .scaleEffect(1.4)
+                    Text("Loading gym details…")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+            }
             
             VStack {
                 Spacer()
@@ -196,7 +214,7 @@ struct Heatmap: View {
         .sheet(isPresented: $showGymDetail) {
             if let gym = selectedGym {
                 NavigationView {
-                    GymDetailView(gym: gym)
+                    GymDetailView(gym: gym, viewModel: preloadingViewModel)
                 }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -213,8 +231,27 @@ struct Heatmap: View {
                     longitude: gym.location.lon
                 )) {
                     Button(action: {
-                        selectedGym = gym
-                        showGymDetail = true
+                        // Start preloading the GymDetailViewModel before presenting
+                        if isPreloading {
+                            // ignore taps while already preloading
+                            return
+                        }
+
+                        isPreloading = true
+                        preloadingViewModel = nil
+
+                        let vm = GymDetailViewModel(gym: gym)
+                        preloadingViewModel = vm
+
+                        Task {
+                            await vm.loadData()
+                            // After preload completes, present the sheet on main actor
+                            await MainActor.run {
+                                selectedGym = gym
+                                isPreloading = false
+                                showGymDetail = true
+                            }
+                        }
                     }) {
                         VStack(spacing: 4) {
                             Circle()
