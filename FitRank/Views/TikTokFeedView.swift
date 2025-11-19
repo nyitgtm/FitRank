@@ -39,7 +39,6 @@ struct TikTokFeedView: View {
     @State private var workouts: [Workout] = []
     @State private var currentIndex = 0
     @State private var isLoading = true
-    @State private var showComments = false
     
     private let firebaseService = FirebaseService.shared
     
@@ -63,8 +62,7 @@ struct TikTokFeedView: View {
                     ForEach(Array(workouts.enumerated()), id: \.element.id) { index, workout in
                         WorkoutFeedCard(
                             workout: workout,
-                            voteService: voteService,
-                            showComments: $showComments
+                            voteService: voteService
                         )
                         .tag(index)
                         .id(workout.id) // Force recreate on workout change
@@ -116,7 +114,7 @@ struct TikTokFeedView: View {
 struct WorkoutFeedCard: View {
     let workout: Workout
     @ObservedObject var voteService: VoteService
-    @Binding var showComments: Bool
+    @State private var showComments: Bool = false
     
     @State private var player: AVPlayer?
     @State private var isPlaying = false
@@ -314,6 +312,15 @@ struct WorkoutFeedCard: View {
         .sheet(isPresented: $showComments) {
             if let workoutID = workout.id {
                 CommentsSheetView(workoutID: workoutID)
+                    .presentationDragIndicator(.visible)
+                    .presentationDetents([.medium, .large])
+                    .onAppear {
+                        // Clear any cached comments for this workout and then fetch fresh ones
+                        commentService.clearCommentsForWorkout(workoutID)
+                        Task {
+                            await commentService.fetchComments(workoutID: workoutID)
+                        }
+                    }
                     .onDisappear {
                         // Refresh comment count when sheet closes
                         Task {

@@ -3,7 +3,7 @@ import FirebaseAuth
 
 struct CommentsSheetView: View {
     let workoutID: String
-    @StateObject private var commentService = CommentService.shared
+    @ObservedObject var commentService = CommentService.shared
     @StateObject private var userRepository = UserRepository()
     @Environment(\.dismiss) var dismiss
     
@@ -104,10 +104,20 @@ struct CommentsSheetView: View {
     }
     
     private func loadComments() async {
+        print("🎬 Loading comments for workout: \(workoutID)")
+        
+        // Clear cached user map and comment/reply/like cache for this workout
+        await MainActor.run {
+            commentUsers = [:]
+        }
+        commentService.clearCommentsForWorkout(workoutID)
+
+        // Fetch fresh comments
         await commentService.fetchComments(workoutID: workoutID)
         
         // Load user data for all comments
         if let comments = commentService.comments[workoutID] {
+            print("👥 Loading user data for \(comments.count) comments")
             for comment in comments {
                 if commentUsers[comment.userID] == nil {
                     do {
@@ -121,6 +131,8 @@ struct CommentsSheetView: View {
                     }
                 }
             }
+        } else {
+            print("⚠️ No comments found in cache for workout: \(workoutID)")
         }
     }
     
@@ -208,9 +220,9 @@ struct CommentRowView: View {
                                 await loadLikeStatus()
                             }
                         } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: commentService.commentLikes[comment.id ?? ""] == true ? "heart.fill" : "heart")
-                                    .foregroundColor(commentService.commentLikes[comment.id ?? ""] == true ? .red : .secondary)
+                                HStack(spacing: 4) {
+                                        Image(systemName: commentService.commentLikes["\(workoutID):\(comment.id ?? "")"] == true ? "heart.fill" : "heart")
+                                            .foregroundColor(commentService.commentLikes["\(workoutID):\(comment.id ?? "")"] == true ? .red : .secondary)
                                 if comment.likes > 0 {
                                     Text("\(comment.likes)")
                                         .font(.caption)
@@ -251,17 +263,19 @@ struct CommentRowView: View {
             }
             
             // Replies
-            if showReplies, let replies = commentService.replies[comment.id ?? ""] {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(replies) { reply in
-                        ReplyRowView(
-                            workoutID: workoutID,
-                            reply: reply,
-                            user: replyUsers[reply.userID]
-                        )
+            if showReplies {
+                if let replies = commentService.replies["\(workoutID):\(comment.id ?? "")"] {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(replies) { reply in
+                            ReplyRowView(
+                                workoutID: workoutID,
+                                reply: reply,
+                                user: replyUsers[reply.userID]
+                            )
+                        }
                     }
+                    .padding(.leading, 44)
                 }
-                .padding(.leading, 44)
             }
         }
         .task {
@@ -280,7 +294,8 @@ struct CommentRowView: View {
         await commentService.fetchReplies(workoutID: workoutID, commentID: commentID)
         
         // Load user data for replies
-        if let replies = commentService.replies[commentID] {
+        let repliesKey = "\(workoutID):\(commentID)"
+        if let replies = commentService.replies[repliesKey] {
             for reply in replies {
                 if replyUsers[reply.userID] == nil {
                     do {
@@ -363,8 +378,8 @@ struct ReplyRowView: View {
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: commentService.commentLikes[reply.id ?? ""] == true ? "heart.fill" : "heart")
-                            .foregroundColor(commentService.commentLikes[reply.id ?? ""] == true ? .red : .secondary)
+                        Image(systemName: commentService.commentLikes["\(workoutID):\(reply.id ?? "")"] == true ? "heart.fill" : "heart")
+                            .foregroundColor(commentService.commentLikes["\(workoutID):\(reply.id ?? "")"] == true ? .red : .secondary)
                             .font(.caption)
                         if reply.likes > 0 {
                             Text("\(reply.likes)")
