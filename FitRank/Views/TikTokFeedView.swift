@@ -314,6 +314,14 @@ struct WorkoutFeedCard: View {
         .sheet(isPresented: $showComments) {
             if let workoutID = workout.id {
                 CommentsSheetView(workoutID: workoutID)
+                    .presentationDragIndicator(.visible)
+                    .presentationDetents([.medium, .large])
+                    .onAppear {
+                        // Force reload comments when sheet appears
+                        Task {
+                            await commentService.fetchComments(workoutID: workoutID)
+                        }
+                    }
                     .onDisappear {
                         // Refresh comment count when sheet closes
                         Task {

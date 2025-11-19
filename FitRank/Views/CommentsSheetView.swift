@@ -3,7 +3,7 @@ import FirebaseAuth
 
 struct CommentsSheetView: View {
     let workoutID: String
-    @StateObject private var commentService = CommentService.shared
+    @ObservedObject var commentService = CommentService.shared
     @StateObject private var userRepository = UserRepository()
     @Environment(\.dismiss) var dismiss
     
@@ -104,10 +104,19 @@ struct CommentsSheetView: View {
     }
     
     private func loadComments() async {
+        print("🎬 Loading comments for workout: \(workoutID)")
+        
+        // Clear ALL cached data first - not just for this workout
+        await MainActor.run {
+            commentUsers = [:]
+        }
+        
+        // Fetch fresh comments
         await commentService.fetchComments(workoutID: workoutID)
         
         // Load user data for all comments
         if let comments = commentService.comments[workoutID] {
+            print("👥 Loading user data for \(comments.count) comments")
             for comment in comments {
                 if commentUsers[comment.userID] == nil {
                     do {
@@ -121,6 +130,8 @@ struct CommentsSheetView: View {
                     }
                 }
             }
+        } else {
+            print("⚠️ No comments found in cache for workout: \(workoutID)")
         }
     }
     

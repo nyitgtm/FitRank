@@ -13,9 +13,25 @@ class CommentService: ObservableObject {
     
     private init() {}
     
+    // MARK: - Clear cached data
+    
+    func clearCommentsForWorkout(_ workoutID: String) {
+        comments.removeValue(forKey: workoutID)
+        commentCounts.removeValue(forKey: workoutID)
+        // Clear likes for comments in this workout
+        // Note: This is a simple clear, not perfect but prevents most persistence
+        print("🧹 Cleared comments cache for workout: \(workoutID)")
+    }
+    
     // MARK: - Fetch Comments
     
     func fetchComments(workoutID: String) async {
+        // First, clear any existing cached data for this workout
+        await MainActor.run {
+            self.comments[workoutID] = []
+            self.commentCounts[workoutID] = 0
+        }
+        
         do {
             print("📥 Fetching comments for workout: \(workoutID)")
             
@@ -26,6 +42,16 @@ class CommentService: ObservableObject {
                 .getDocuments()
             
             print("📄 Found \(snapshot.documents.count) comments")
+            
+            // If no documents, explicitly set empty array
+            if snapshot.documents.isEmpty {
+                await MainActor.run {
+                    self.comments[workoutID] = []
+                    self.commentCounts[workoutID] = 0
+                }
+                print("✅ No comments for workout \(workoutID)")
+                return
+            }
             
             let fetchedComments = snapshot.documents.compactMap { doc -> Comment? in
                 do {
@@ -50,6 +76,11 @@ class CommentService: ObservableObject {
             print("✅ Fetched \(fetchedComments.count) comments for workout \(workoutID)")
         } catch {
             print("❌ Error fetching comments: \(error)")
+            // On error, make sure we set empty array
+            await MainActor.run {
+                self.comments[workoutID] = []
+                self.commentCounts[workoutID] = 0
+            }
         }
     }
     
