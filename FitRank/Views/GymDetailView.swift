@@ -8,9 +8,14 @@ struct GymDetailView: View {
     @State private var selectedWorkout: Workout?
     @State private var showWorkoutDetail = false
     
-    init(gym: Gym) {
+    // Allow injecting a preloaded view model to avoid re-fetching when possible
+    init(gym: Gym, viewModel: GymDetailViewModel? = nil) {
         self.gym = gym
-        _viewModel = StateObject(wrappedValue: GymDetailViewModel(gym: gym))
+        if let vm = viewModel {
+            _viewModel = StateObject(wrappedValue: vm)
+        } else {
+            _viewModel = StateObject(wrappedValue: GymDetailViewModel(gym: gym))
+        }
     }
     
     var body: some View {
@@ -292,7 +297,15 @@ class GymDetailViewModel: ObservableObject {
     }
     
     func loadData() async {
-        isInitialLoading = false   // moved up
+        // Show initial loading until we've attempted to load owner and best lifts
+        isInitialLoading = true
+
+        defer {
+            // Ensure loading state cleared no matter what
+            Task { @MainActor in
+                self.isInitialLoading = false
+            }
+        }
 
         if let ownerTeamId = gym.ownerTeamId, ownerTeamId != "teams/0" {
             await loadOwnerTeam(teamId: ownerTeamId)
