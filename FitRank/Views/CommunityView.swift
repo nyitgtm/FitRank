@@ -298,6 +298,50 @@ struct PostCardView: View {
         if tag.contains("regal eagle")   { return .yellow }
         return .orange
     }
+    
+    // Helper function to format timestamps in a user-friendly way
+    private func formatTimestamp(_ date: Date) -> String {
+        let calendar = Calendar.current
+        let now = Date()
+        let timeInterval = now.timeIntervalSince(date)
+        
+        // Less than a minute (60 seconds)
+        if timeInterval < 60 {
+            return "Just now"
+        }
+        
+        // Less than an hour (60 minutes)
+        if timeInterval < 3600 {
+            let minutes = Int(timeInterval / 60)
+            return "\(minutes)m ago"
+        }
+        
+        // Today - less than 24 hours AND same calendar day
+        if calendar.isDateInToday(date) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h:mm a"
+            return "Today at \(formatter.string(from: date))"
+        }
+        
+        // Yesterday
+        if calendar.isDateInYesterday(date) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h:mm a"
+            return "Yesterday at \(formatter.string(from: date))"
+        }
+        
+        // Within the past week (7 days)
+        if timeInterval < 604800 {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE 'at' h:mm a"
+            return formatter.string(from: date)
+        }
+        
+        // Older posts - show date
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d 'at' h:mm a"
+        return formatter.string(from: date)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -318,7 +362,7 @@ struct PostCardView: View {
                                 .foregroundColor(teamColor)
                                 .cornerRadius(6)
                         }
-                        Text(post.createdAt, style: .time)
+                        Text(formatTimestamp(post.createdAt))
                             .font(.caption2).foregroundColor(.secondary)
                     }
                 }
@@ -543,7 +587,7 @@ struct CommentsSheet: View {
                                                     )
                                                 } catch {
                                                     await MainActor.run {
-                                                        errorMessage = "Couldn’t delete. \(error.localizedDescription)"
+                                                        errorMessage = "Couldn't delete. \(error.localizedDescription)"
                                                         showErrorAlert = true
                                                         // put the comment back if delete failed
                                                         comments.insert(c, at: 0)
