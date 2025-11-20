@@ -70,7 +70,8 @@ struct CommunityView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
             // Header
             HStack {
                 Spacer()
@@ -169,7 +170,28 @@ struct CommunityView: View {
                 }
             }
         }
+        }
         .navigationTitle("")
+        // Temporary upload success banner
+        .overlay(alignment: .top) {
+            if vm.postUploadSuccess {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.white)
+                    Text("Post uploaded")
+                        .foregroundColor(.white)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.green)
+                .cornerRadius(12)
+                .padding(.top, 8)
+                .shadow(radius: 6)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
 
         // Composer Sheet
@@ -290,6 +312,10 @@ struct PostCardView: View {
     var deleteAction: (() -> Void)? = nil
     
     @State private var showDeleteAlert = false
+    @State private var extractedImageURLs: [URL] = []
+
+    // Limit images so they don't exceed the visible screen width
+    private let maxImageWidth: CGFloat = min(UIScreen.main.bounds.width - 40, 400)
 
     private var teamColor: Color {
         let tag = post.teamTag?.lowercased() ?? ""
@@ -297,6 +323,36 @@ struct PostCardView: View {
         if tag.contains("dark sharks")   { return .blue }
         if tag.contains("regal eagle")   { return .yellow }
         return .orange
+    }
+    
+    // Extract image URLs from text
+    private func extractImageURLs(from text: String) -> [URL] {
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        let matches = detector?.matches(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count))
+        
+        let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "bmp"]
+        
+        var urls: [URL] = []
+        for match in matches ?? [] {
+            if let range = Range(match.range, in: text),
+               let url = URL(string: String(text[range])) {
+                // Check if URL points to an image
+                let pathExtension = url.pathExtension.lowercased()
+                if imageExtensions.contains(pathExtension) || url.absoluteString.contains("media-amazon") || url.absoluteString.contains("imgur") {
+                    urls.append(url)
+                }
+            }
+        }
+        return urls
+    }
+    
+    // Remove image URLs from display text
+    private func textWithoutImageURLs(_ text: String) -> String {
+        var cleanedText = text
+        for url in extractedImageURLs {
+            cleanedText = cleanedText.replacingOccurrences(of: url.absoluteString, with: "")
+        }
+        return cleanedText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     // Helper function to format timestamps in a user-friendly way
@@ -391,36 +447,75 @@ struct PostCardView: View {
 
             // Text
             if !post.text.isEmpty {
-                Text(post.text).font(.body)
+                let cleanText = textWithoutImageURLs(post.text)
+                if !cleanText.isEmpty {
+                    Text(cleanText).font(.body)
+                }
+            }
+            
+            // Images extracted from text URLs
+            if !extractedImageURLs.isEmpty {
+                ForEach(extractedImageURLs, id: \.self) { imageURL in
+                    AsyncImage(url: imageURL) { phase in
+                        switch phase {
+                        case .empty:
+                            Rectangle().fill(Color.gray.opacity(0.15))
+                                .frame(maxWidth: maxImageWidth)
+                                .frame(height: 220)
+                                .overlay(ProgressView())
+                                .cornerRadius(12)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: maxImageWidth)
+                                .cornerRadius(12)
+                        case .failure:
+                            Rectangle().fill(Color.gray.opacity(0.15))
+                                .frame(maxWidth: maxImageWidth)
+                                .frame(height: 220)
+                                .overlay(
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "exclamationmark.triangle")
+                                            .font(.title2)
+                                        Text("Failed to load image")
+                                            .font(.caption)
+                                    }
+                                    .foregroundColor(.secondary)
+                                )
+                                .cornerRadius(12)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                }
             }
 
             // Image (local or remote)
             if let img = post.image {
                 Image(uiImage: img)
                     .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 220)
-                    .clipped()
+                    .scaledToFit()
+                    .frame(maxWidth: maxImageWidth)
                     .cornerRadius(12)
             } else if let urlStr = post.imageURLString, let url = URL(string: urlStr) {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .empty:
                         Rectangle().fill(Color.gray.opacity(0.15))
+                            .frame(maxWidth: maxImageWidth)
                             .frame(height: 220)
                             .overlay(ProgressView())
                             .cornerRadius(12)
                     case .success(let image):
                         image
                             .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 220)
-                            .clipped()
+                            .scaledToFit()
+                            .frame(maxWidth: maxImageWidth)
                             .cornerRadius(12)
                     case .failure:
                         Rectangle().fill(Color.gray.opacity(0.15))
+                            .frame(maxWidth: maxImageWidth)
                             .frame(height: 220)
                             .overlay(Image(systemName: "exclamationmark.triangle"))
                             .cornerRadius(12)
@@ -457,6 +552,9 @@ struct PostCardView: View {
         }, message: {
             Text("Are you sure you want to delete this post? This action cannot be undone.")
         })
+        .onAppear {
+            extractedImageURLs = extractImageURLs(from: post.text)
+        }
     }
 }
 
