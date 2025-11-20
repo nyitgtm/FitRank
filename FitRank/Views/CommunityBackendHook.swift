@@ -236,21 +236,14 @@ final class CommunityService {
         var textToSave = text
 
         if let image, let data = image.jpegData(compressionQuality: 0.85) {
-            // Try uploading to the external API first
+            // Try uploading to the external API first (store returned URL in imageURL)
             if let uploaded = try? await uploadImageToNetlifyAPI(data: data, fileName: "photo.jpg") {
                 imageURL = uploaded
-                // Append returned URL to the post text so the post message contains the link
-                if !imageURL!.isEmpty {
-                    textToSave = textToSave.isEmpty ? imageURL! : textToSave + " " + imageURL!
-                }
             } else {
                 // Fallback: upload to Firebase Storage if external API fails
                 let storageRef = Storage.storage().reference(withPath: "posts/\(ref.documentID)/photo.jpg")
                 _ = try await storageRef.putDataAsync(data, metadata: nil)
                 imageURL = try await storageRef.downloadURL().absoluteString
-                if !imageURL!.isEmpty {
-                    textToSave = textToSave.isEmpty ? imageURL! : textToSave + " " + imageURL!
-                }
             }
         }
 
