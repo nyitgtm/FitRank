@@ -3,6 +3,15 @@ import FirebaseAuth
 import FirebaseFirestore
 import FirebaseStorage
 
+// Small Data helper
+fileprivate extension Data {
+    mutating func appendString(_ string: String) {
+        if let d = string.data(using: .utf8) {
+            append(d)
+        }
+    }
+}
+
 // MARK: - Models (single source of truth)
 
 
@@ -224,22 +233,78 @@ final class CommunityService {
         let ref = db.collection("posts").document()
 
         var imageURL: String? = nil
+        var textToSave = text
+
         if let image, let data = image.jpegData(compressionQuality: 0.85) {
-            let storageRef = Storage.storage().reference(withPath: "posts/\(ref.documentID)/photo.jpg")
-            _ = try await storageRef.putDataAsync(data, metadata: nil)
-            imageURL = try await storageRef.downloadURL().absoluteString
+            // Try uploading to the external API first
+            if let uploaded = try? await uploadImageToNetlifyAPI(data: data, fileName: "photo.jpg") {
+                imageURL = uploaded
+                // Append returned URL to the post text so the post message contains the link
+                if !imageURL!.isEmpty {
+                    textToSave = textToSave.isEmpty ? imageURL! : textToSave + " " + imageURL!
+                }
+            } else {
+                // Fallback: upload to Firebase Storage if external API fails
+                let storageRef = Storage.storage().reference(withPath: "posts/\(ref.documentID)/photo.jpg")
+                _ = try await storageRef.putDataAsync(data, metadata: nil)
+                imageURL = try await storageRef.downloadURL().absoluteString
+                if !imageURL!.isEmpty {
+                    textToSave = textToSave.isEmpty ? imageURL! : textToSave + " " + imageURL!
+                }
+            }
         }
 
         try await ref.setData([
             "authorId": uid,
             "authorName": authorName,
             "teamTag": teamName as Any,
-            "text": text,
+            "text": textToSave,
             "imageURL": imageURL as Any,
             "likeCount": 0,
             "commentCount": 0,
             "createdAt": FieldValue.serverTimestamp()
         ])
+    }
+
+    // Upload image bytes to the Netlify API endpoint and return the returned URL string.
+    private func uploadImageToNetlifyAPI(data: Data, fileName: String) async throws -> String {
+        let url = URL(string: "https://fitrank.netlify.app/api/upload")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.appendString("--\(boundary)\r\n")
+        body.appendString("Content-Disposition: form-data; name=\"file\"; filename=\"")
+        body.appendString(fileName)
+        body.appendString("\"\r\n")
+        body.appendString("Content-Type: image/jpeg\r\n\r\n")
+        body.append(data)
+        body.appendString("\r\n")
+        body.appendString("--\(boundary)--\r\n")
+
+        request.httpBody = body
+
+        let (respData, resp) = try await URLSession.shared.data(for: request)
+        guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw NSError(domain: "upload", code: 1, userInfo: ["response": resp])
+        }
+
+        // Try parse JSON: { "url": "https://..." }
+        if let json = try? JSONSerialization.jsonObject(with: respData) as? [String: Any] {
+            if let urlStr = (json["url"] as? String) ?? (json["link"] as? String) ?? (json["location"] as? String) {
+                return urlStr
+            }
+        }
+
+        // Fallback: treat body as plain text URL
+        if let bodyString = String(data: respData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !bodyString.isEmpty {
+            return bodyString
+        }
+
+        throw NSError(domain: "upload", code: 2, userInfo: [NSLocalizedDescriptionKey: "No URL returned from upload API"]) 
     }
 
     func toggleLike(postId: String, postAuthorId: String, postText: String, currentlyLiked: Bool) async {
