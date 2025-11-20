@@ -456,15 +456,30 @@ struct SettingsSheet: View {
             Form {
                 Section(header: Text("Fitness Goal")) {
                     Picker("Goal", selection: $selectedGoal) {
-                        ForEach(FitnessGoal.allCases, id: \.self) { goal in
-                            HStack {
-                                Image(systemName: goal.icon)
-                                Text(goal.displayName)
-                            }
-                            .tag(goal)
-                        }
+                        Text("Cutting").tag(FitnessGoal.cutting)
+                        Text("Bulking").tag(FitnessGoal.bulking)
                     }
                     .pickerStyle(.segmented)
+                    
+                    // Visual indicator with icons below
+                    HStack(spacing: 0) {
+                        HStack {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Weight Loss")
+                                .font(.caption)
+                        }
+                        .frame(maxWidth: .infinity)
+                        
+                        HStack {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .foregroundColor(.blue)
+                            Text("Weight Gain")
+                                .font(.caption)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .foregroundColor(.secondary)
                     
                     Text(selectedGoal == .cutting ? "Focus on losing body fat" : "Focus on building muscle mass")
                         .font(.caption)
