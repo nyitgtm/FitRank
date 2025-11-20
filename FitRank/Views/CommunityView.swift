@@ -290,6 +290,7 @@ struct PostCardView: View {
     var deleteAction: (() -> Void)? = nil
     
     @State private var showDeleteAlert = false
+    @State private var extractedImageURLs: [URL] = []
 
     private var teamColor: Color {
         let tag = post.teamTag?.lowercased() ?? ""
@@ -297,6 +298,36 @@ struct PostCardView: View {
         if tag.contains("dark sharks")   { return .blue }
         if tag.contains("regal eagle")   { return .yellow }
         return .orange
+    }
+    
+    // Extract image URLs from text
+    private func extractImageURLs(from text: String) -> [URL] {
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        let matches = detector?.matches(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count))
+        
+        let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "bmp"]
+        
+        var urls: [URL] = []
+        for match in matches ?? [] {
+            if let range = Range(match.range, in: text),
+               let url = URL(string: String(text[range])) {
+                // Check if URL points to an image
+                let pathExtension = url.pathExtension.lowercased()
+                if imageExtensions.contains(pathExtension) || url.absoluteString.contains("media-amazon") || url.absoluteString.contains("imgur") {
+                    urls.append(url)
+                }
+            }
+        }
+        return urls
+    }
+    
+    // Remove image URLs from display text
+    private func textWithoutImageURLs(_ text: String) -> String {
+        var cleanedText = text
+        for url in extractedImageURLs {
+            cleanedText = cleanedText.replacingOccurrences(of: url.absoluteString, with: "")
+        }
+        return cleanedText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     // Helper function to format timestamps in a user-friendly way
@@ -391,7 +422,50 @@ struct PostCardView: View {
 
             // Text
             if !post.text.isEmpty {
-                Text(post.text).font(.body)
+                let cleanText = textWithoutImageURLs(post.text)
+                if !cleanText.isEmpty {
+                    Text(cleanText).font(.body)
+                }
+            }
+            
+            // Images extracted from text URLs
+            if !extractedImageURLs.isEmpty {
+                ForEach(extractedImageURLs, id: \.self) { imageURL in
+                    AsyncImage(url: imageURL) { phase in
+                        switch phase {
+                        case .empty:
+                            Rectangle().fill(Color.gray.opacity(0.15))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 220)
+                                .overlay(ProgressView())
+                                .cornerRadius(12)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 220)
+                                .clipped()
+                                .cornerRadius(12)
+                        case .failure:
+                            Rectangle().fill(Color.gray.opacity(0.15))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 220)
+                                .overlay(
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "exclamationmark.triangle")
+                                            .font(.title2)
+                                        Text("Failed to load image")
+                                            .font(.caption)
+                                    }
+                                    .foregroundColor(.secondary)
+                                )
+                                .cornerRadius(12)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                }
             }
 
             // Image (local or remote)
@@ -457,6 +531,9 @@ struct PostCardView: View {
         }, message: {
             Text("Are you sure you want to delete this post? This action cannot be undone.")
         })
+        .onAppear {
+            extractedImageURLs = extractImageURLs(from: post.text)
+        }
     }
 }
 
