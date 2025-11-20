@@ -443,6 +443,7 @@ final class CommunityVM_Firebase: ObservableObject {
     @Published var draftImage: UIImage?
     @Published var showCoinReward = false
     @Published var coinsEarned = 0
+    @Published var postUploadSuccess = false
     
     var unreadCount: Int {
         notifications.filter { !$0.isRead }.count
@@ -535,6 +536,11 @@ final class CommunityVM_Firebase: ObservableObject {
                     draftText = ""
                     draftImage = nil
                     showComposer = false
+                    postUploadSuccess = true
+                    // Hide the banner after a short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        self.postUploadSuccess = false
+                    }
                 }
             } catch {
                 print("publish error:", error)

@@ -70,7 +70,8 @@ struct CommunityView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
             // Header
             HStack {
                 Spacer()
@@ -169,7 +170,28 @@ struct CommunityView: View {
                 }
             }
         }
+        }
         .navigationTitle("")
+        // Temporary upload success banner
+        .overlay(alignment: .top) {
+            if vm.postUploadSuccess {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.white)
+                    Text("Post uploaded")
+                        .foregroundColor(.white)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.green)
+                .cornerRadius(12)
+                .padding(.top, 8)
+                .shadow(radius: 6)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
 
         // Composer Sheet
