@@ -49,12 +49,283 @@ class FirebaseService: ObservableObject {
 
     func createWorkout(_ workout: Workout) async throws -> String {
         let documentRef = try await db.collection("workouts").addDocument(from: workout)
-        return documentRef.documentID
+        let workoutId = documentRef.documentID
+
+        // After creating the workout, update the gym's best lifts / owner if applicable
+        Task.detached { [weak self] in
+            guard let self = self else { return }
+            await self.updateGymBestForWorkout(workout: workout, workoutId: workoutId)
+        }
+
+        return workoutId
     }
     
     func createWorkoutWithId(_ workout: Workout) async throws {
         guard let workoutId = workout.id else { throw FirebaseError.invalidWorkoutId }
         try await db.collection("workouts").document(workoutId).setData(from: workout)
+        
+        // After creating with id, update the gym's best lifts / owner if applicable
+        Task.detached { [weak self] in
+            guard let self = self else { return }
+            await self.updateGymBestForWorkout(workout: workout, workoutId: workoutId)
+        }
+    }
+
+    // MARK: - Gym Best / Ownership Logic
+
+    /// Update the gym document's best lift for the given workout (if it beats the existing best)
+    /// and recompute the `ownerTeamId` based on how many best lifts each team holds.
+    func updateGymBestForWorkout(workout: Workout, workoutId: String) async {
+        guard let gymId = workout.gymId, !gymId.isEmpty else { return }
+
+        let gymRef = db.collection("gyms").document(gymId)
+
+        do {
+            let gymDoc = try await gymRef.getDocument()
+            guard var gym = try? gymDoc.data(as: Gym.self) else {
+                print("❌ Could not decode gym when updating bests for workout \(workoutId)")
+                return
+            }
+
+            var didChange = false
+
+            // Helper to compare and update a lift
+            func considerUpdate(current: LiftRecord?, newWeight: Int, newUserId: String, newTeamId: String, newWorkoutId: String) -> LiftRecord? {
+                let currentWeight = current?.weight ?? 0
+                if Double(newWeight) > currentWeight {
+                    return LiftRecord(weight: Double(newWeight), userId: newUserId, teamId: newTeamId, workoutId: newWorkoutId)
+                }
+                return current
+            }
+
+            switch workout.liftType.lowercased() {
+            case "bench":
+                let updated = considerUpdate(current: gym.bestBench, newWeight: workout.weight, newUserId: workout.userId, newTeamId: workout.teamId, newWorkoutId: workoutId)
+                if updated != gym.bestBench { gym.bestBench = updated; didChange = true }
+            case "squat":
+                let updated = considerUpdate(current: gym.bestSquat, newWeight: workout.weight, newUserId: workout.userId, newTeamId: workout.teamId, newWorkoutId: workoutId)
+                if updated != gym.bestSquat { gym.bestSquat = updated; didChange = true }
+            case "deadlift":
+                let updated = considerUpdate(current: gym.bestDeadlift, newWeight: workout.weight, newUserId: workout.userId, newTeamId: workout.teamId, newWorkoutId: workoutId)
+                if updated != gym.bestDeadlift { gym.bestDeadlift = updated; didChange = true }
+            default:
+                break
+            }
+
+            // If any best lift changed, or even if not (we need to recompute owner in case of new additions), compute owner
+            // Gather team ids for each best lift (normalize to path form "/teams/{id}" when possible)
+            func normalizeTeamPath(_ raw: String?) -> String? {
+                guard let raw = raw else { return nil }
+                if raw.contains("/teams/") { return raw }
+                // If it looks like just an id, convert to full path
+                return "/teams/\(raw)"
+            }
+
+            let benchTeam = normalizeTeamPath(gym.bestBench?.teamId)
+            let squatTeam = normalizeTeamPath(gym.bestSquat?.teamId)
+            let deadliftTeam = normalizeTeamPath(gym.bestDeadlift?.teamId)
+
+            var counts: [String: Int] = [:]
+            for t in [benchTeam, squatTeam, deadliftTeam] {
+                if let t = t {
+                    counts[t, default: 0] += 1
+                }
+            }
+
+            // Decide owner
+            var ownerTeamPath: String? = nil
+            if counts.isEmpty {
+                ownerTeamPath = nil
+            } else {
+                let maxCount = counts.values.max() ?? 0
+                let leaders = counts.filter { $0.value == maxCount }.map { $0.key }
+
+                if leaders.count == 1 {
+                    ownerTeamPath = leaders.first
+                } else {
+                    // Tie: if all teams have equal count (e.g., each holds 1), treat as tie and set to /teams/0
+                    ownerTeamPath = "/teams/0"
+                }
+            }
+
+            // Prepare update payload
+            var updateData: [String: Any] = [:]
+
+            if didChange {
+                if let b = gym.bestBench {
+                    updateData["bestBench"] = [
+                        "weight": b.weight,
+                        "userId": b.userId,
+                        "teamId": b.teamId,
+                        "workoutId": b.workoutId
+                    ]
+                }
+                if let s = gym.bestSquat {
+                    updateData["bestSquat"] = [
+                        "weight": s.weight,
+                        "userId": s.userId,
+                        "teamId": s.teamId,
+                        "workoutId": s.workoutId
+                    ]
+                }
+                if let d = gym.bestDeadlift {
+                    updateData["bestDeadlift"] = [
+                        "weight": d.weight,
+                        "userId": d.userId,
+                        "teamId": d.teamId,
+                        "workoutId": d.workoutId
+                    ]
+                }
+            }
+
+            // Owner team reference
+            if let ownerPath = ownerTeamPath {
+                updateData["ownerTeamId"] = db.document(ownerPath)
+            } else {
+                // Remove ownerTeamId if none
+                updateData["ownerTeamId"] = FieldValue.delete()
+            }
+
+            if !updateData.isEmpty {
+                try await gymRef.updateData(updateData)
+                print("✅ Updated gym \(gymId) bests/owner after workout \(workoutId)")
+            }
+        } catch {
+            print("❌ Error updating gym bests for workout \(workoutId): \(error)")
+        }
+    }
+    
+    /// Recalculate gym ownership after a workout deletion
+    /// This queries all workouts at the gym to find the current best lifts
+    func recalculateGymOwnership(gymId: String) async {
+        let gymRef = db.collection("gyms").document(gymId)
+        
+        do {
+            // Get all published workouts for this gym
+            let workoutsSnapshot = try await db.collection("workouts")
+                .whereField("gymId", isEqualTo: gymId)
+                .whereField("status", isEqualTo: "published")
+                .getDocuments()
+            
+            let workouts = workoutsSnapshot.documents.compactMap { try? $0.data(as: Workout.self) }
+            
+            // Find best for each lift type
+            var bestBench: LiftRecord? = nil
+            var bestSquat: LiftRecord? = nil
+            var bestDeadlift: LiftRecord? = nil
+            
+            for workout in workouts {
+                guard let workoutId = workout.id else { continue }
+                let record = LiftRecord(
+                    weight: Double(workout.weight),
+                    userId: workout.userId,
+                    teamId: workout.teamId,
+                    workoutId: workoutId
+                )
+                
+                switch workout.liftType.lowercased() {
+                case "bench":
+                    if bestBench == nil || record.weight > bestBench!.weight {
+                        bestBench = record
+                    }
+                case "squat":
+                    if bestSquat == nil || record.weight > bestSquat!.weight {
+                        bestSquat = record
+                    }
+                case "deadlift":
+                    if bestDeadlift == nil || record.weight > bestDeadlift!.weight {
+                        bestDeadlift = record
+                    }
+                default:
+                    break
+                }
+            }
+            
+            // Normalize team paths
+            func normalizeTeamPath(_ raw: String?) -> String? {
+                guard let raw = raw else { return nil }
+                if raw.contains("/teams/") { return raw }
+                return "/teams/\(raw)"
+            }
+            
+            let benchTeam = normalizeTeamPath(bestBench?.teamId)
+            let squatTeam = normalizeTeamPath(bestSquat?.teamId)
+            let deadliftTeam = normalizeTeamPath(bestDeadlift?.teamId)
+            
+            // Count how many best lifts each team holds
+            var counts: [String: Int] = [:]
+            for t in [benchTeam, squatTeam, deadliftTeam] {
+                if let t = t {
+                    counts[t, default: 0] += 1
+                }
+            }
+            
+            // Determine owner
+            var ownerTeamPath: String? = nil
+            if counts.isEmpty {
+                ownerTeamPath = nil
+            } else {
+                let maxCount = counts.values.max() ?? 0
+                let leaders = counts.filter { $0.value == maxCount }.map { $0.key }
+                
+                if leaders.count == 1 {
+                    ownerTeamPath = leaders.first
+                } else {
+                    // Tie - set to /teams/0
+                    ownerTeamPath = "/teams/0"
+                }
+            }
+            
+            // Prepare update
+            var updateData: [String: Any] = [:]
+            
+            if let b = bestBench {
+                updateData["bestBench"] = [
+                    "weight": b.weight,
+                    "userId": b.userId,
+                    "teamId": b.teamId,
+                    "workoutId": b.workoutId
+                ]
+            } else {
+                updateData["bestBench"] = FieldValue.delete()
+            }
+            
+            if let s = bestSquat {
+                updateData["bestSquat"] = [
+                    "weight": s.weight,
+                    "userId": s.userId,
+                    "teamId": s.teamId,
+                    "workoutId": s.workoutId
+                ]
+            } else {
+                updateData["bestSquat"] = FieldValue.delete()
+            }
+            
+            if let d = bestDeadlift {
+                updateData["bestDeadlift"] = [
+                    "weight": d.weight,
+                    "userId": d.userId,
+                    "teamId": d.teamId,
+                    "workoutId": d.workoutId
+                ]
+            } else {
+                updateData["bestDeadlift"] = FieldValue.delete()
+            }
+            
+            // Set owner
+            if let ownerPath = ownerTeamPath {
+                updateData["ownerTeamId"] = db.document(ownerPath)
+            } else {
+                updateData["ownerTeamId"] = FieldValue.delete()
+            }
+            
+            if !updateData.isEmpty {
+                try await gymRef.updateData(updateData)
+                print("✅ Recalculated gym \(gymId) ownership after deletion")
+            }
+        } catch {
+            print("❌ Error recalculating gym ownership for \(gymId): \(error)")
+        }
     }
 
     func getWorkouts(limit: Int = 50) async throws -> [Workout] {
@@ -101,7 +372,20 @@ class FirebaseService: ObservableObject {
     }
 
     func deleteWorkout(workoutId: String) async throws {
+        // First, get the workout to know which gym it was associated with
+        let workoutDoc = try await db.collection("workouts").document(workoutId).getDocument()
+        let workout = try? workoutDoc.data(as: Workout.self)
+        
+        // Delete the workout
         try await db.collection("workouts").document(workoutId).delete()
+        
+        // If the workout was associated with a gym, recalculate gym ownership
+        if let workout = workout, let gymId = workout.gymId {
+            Task.detached { [weak self] in
+                guard let self = self else { return }
+                await self.recalculateGymOwnership(gymId: gymId)
+            }
+        }
     }
     
     func getPublishedWorkouts(limit: Int = 20) async throws -> [Workout] {
