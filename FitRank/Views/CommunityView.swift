@@ -292,6 +292,9 @@ struct PostCardView: View {
     @State private var showDeleteAlert = false
     @State private var extractedImageURLs: [URL] = []
 
+    // Limit images so they don't exceed the visible screen width
+    private let maxImageWidth: CGFloat = min(UIScreen.main.bounds.width - 40, 400)
+
     private var teamColor: Color {
         let tag = post.teamTag?.lowercased() ?? ""
         if tag.contains("killa gorilla") { return .green }
@@ -435,21 +438,19 @@ struct PostCardView: View {
                         switch phase {
                         case .empty:
                             Rectangle().fill(Color.gray.opacity(0.15))
-                                .frame(maxWidth: .infinity)
+                                .frame(maxWidth: maxImageWidth)
                                 .frame(height: 220)
                                 .overlay(ProgressView())
                                 .cornerRadius(12)
                         case .success(let image):
                             image
                                 .resizable()
-                                .scaledToFill()
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 220)
-                                .clipped()
+                                .scaledToFit()
+                                .frame(maxWidth: maxImageWidth)
                                 .cornerRadius(12)
                         case .failure:
                             Rectangle().fill(Color.gray.opacity(0.15))
-                                .frame(maxWidth: .infinity)
+                                .frame(maxWidth: maxImageWidth)
                                 .frame(height: 220)
                                 .overlay(
                                     VStack(spacing: 8) {
@@ -472,29 +473,27 @@ struct PostCardView: View {
             if let img = post.image {
                 Image(uiImage: img)
                     .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 220)
-                    .clipped()
+                    .scaledToFit()
+                    .frame(maxWidth: maxImageWidth)
                     .cornerRadius(12)
             } else if let urlStr = post.imageURLString, let url = URL(string: urlStr) {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .empty:
                         Rectangle().fill(Color.gray.opacity(0.15))
+                            .frame(maxWidth: maxImageWidth)
                             .frame(height: 220)
                             .overlay(ProgressView())
                             .cornerRadius(12)
                     case .success(let image):
                         image
                             .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 220)
-                            .clipped()
+                            .scaledToFit()
+                            .frame(maxWidth: maxImageWidth)
                             .cornerRadius(12)
                     case .failure:
                         Rectangle().fill(Color.gray.opacity(0.15))
+                            .frame(maxWidth: maxImageWidth)
                             .frame(height: 220)
                             .overlay(Image(systemName: "exclamationmark.triangle"))
                             .cornerRadius(12)
