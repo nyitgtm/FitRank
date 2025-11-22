@@ -9,31 +9,13 @@ struct HomeView: View {
     @StateObject private var gymRepository = GymRepository()
     @StateObject private var friendRequestVM = FriendRequestViewModel()
     @StateObject private var friendsVM = FriendsListViewModel()
-    @State private var selectedFilter: WorkoutFilter = .all
     @State private var showingUpload = false
     @State private var showingLeaderboard = false
     @State private var showingUserSearch = false
     @State private var showingFriendRequests = false
-    @State private var showingFriendsList = false
     @State private var showingFullScreenHeatmap = false
     @State private var showingItemShop = false
     @State private var hasLoadedGyms = false
-
-    enum WorkoutFilter: String, CaseIterable {
-        case all = "All"
-        case following = "Following"
-        case team = "Team"
-        case trending = "Trending"
-
-        var color: Color {
-            switch self {
-            case .all: return .blue
-            case .following: return .green
-            case .team: return .orange
-            case .trending: return .red
-            }
-        }
-    }
 
     var body: some View {
         
@@ -41,28 +23,6 @@ struct HomeView: View {
                 // Custom FitRank Header
                 FitRankHeaderView()
                     .padding(.vertical, 8)
-
-                // Filter tabs
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(WorkoutFilter.allCases, id: \.self) { filter in
-                            FilterTabView(
-                                filter: filter,
-                                isSelected: selectedFilter == filter,
-                                friendsCount: filter == .following ? friendsVM.friends.count : nil
-                            ) {
-                                if filter == .following {
-                                    // Show friends list popup when tapping Following
-                                    showingFriendsList = true
-                                } else {
-                                    selectedFilter = filter
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                }
-                .padding(.vertical, 12)
 
                 // Workout feed
                 ScrollView {
@@ -215,9 +175,6 @@ struct HomeView: View {
         .sheet(isPresented: $showingFriendRequests) {
             FriendRequestNotificationsView()
         }
-        .sheet(isPresented: $showingFriendsList) {
-            FriendsListView()
-        }
         .sheet(isPresented: $showingItemShop) {
             ItemShopView()
         }
@@ -314,34 +271,6 @@ struct FitRankHeaderView: View {
                 )
         )
         .padding(.horizontal, 20)
-    }
-}
-
-struct FilterTabView: View {
-    let filter: HomeView.WorkoutFilter
-    let isSelected: Bool
-    let friendsCount: Int?
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Text(filter.rawValue)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                
-                if let count = friendsCount, count > 0 {
-                    Text("(\(count))")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                }
-            }
-            .foregroundColor(isSelected ? .white : filter.color)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(isSelected ? filter.color : filter.color.opacity(0.1))
-            .cornerRadius(16)
-        }
     }
 }
 
