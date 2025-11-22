@@ -15,6 +15,8 @@ struct ProfileView: View {
     @State private var teamName: String = "Loading..."
     @State private var equippedBadge: ShopItem?
     @State private var showingFriendsList = false
+    @State private var showingUserWorkouts = false
+    @State private var showingItemShop = false
     
     var body: some View {
         NavigationView {
@@ -33,57 +35,22 @@ struct ProfileView: View {
                             // Header
                             ModernProfileHeaderView(user: user, equippedBadge: equippedBadge)
                             
+                            // Stats Row
+                            ProfileStatsRow(
+                                friendsCount: friendsVM.friends.count,
+                                workoutCount: workoutViewModel.userWorkouts.count,
+                                tokens: 0,
+                                onFriendsClick: { showingFriendsList = true },
+                                onWorkoutsClick: { showingUserWorkouts = true },
+                                onTokensClick: { showingItemShop = true }
+                            )
+                            
                             // Info Cards
                             VStack(spacing: 20) {
                                 ProfileInfoCard(icon: "person.circle", title: "Full Name", value: user.name)
                                 ProfileInfoCard(icon: "at", title: "Username", value: "@\(user.username)")
                                 ProfileInfoCard(icon: "flag", title: "Team", value: teamName)
                                 ProfileInfoCard(icon: "shield.lefthalf.fill", title: "Role", value: user.isCoach ? "Coach" : "Member")
-                            }
-                            
-                            // Stats Section
-                            StatsSectionModern(workoutCount: workoutViewModel.userWorkouts.count)
-                            
-                            // Following Button
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("Social")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-                                
-                                Button {
-                                    showingFriendsList = true
-                                } label: {
-                                    HStack(spacing: 16) {
-                                        Image(systemName: "person.2.fill")
-                                            .font(.title2)
-                                            .foregroundColor(.green)
-                                            .frame(width: 30)
-                                        
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("FOLLOWING")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            
-                                            Text("\(friendsVM.friends.count) Friends")
-                                                .font(.body)
-                                                .fontWeight(.medium)
-                                                .foregroundColor(.primary)
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .padding(.vertical, 12)
-                                    .padding(.horizontal, 16)
-                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color(.systemGray4), lineWidth: 0.5)
-                                    )
-                                }
                             }
                             
                             // Appearance Navigation Button
@@ -108,9 +75,6 @@ struct ProfileView: View {
                                     showSignInView = true
                                 }
                             }
-                            
-                            // Recent Workouts
-                            ModernRecentWorkoutsSection(workouts: workoutViewModel.userWorkouts)
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 30)
@@ -130,6 +94,20 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showingFriendsList) {
                 FriendsListView()
+            }
+            .sheet(isPresented: $showingUserWorkouts) {
+                if let userId = Auth.auth().currentUser?.uid,
+                   let user = userViewModel.currentUser {
+                    UserWorkoutsView(
+                        workoutViewModel: workoutViewModel,
+                        userId: userId,
+                        userName: user.name,
+                        userUsername: user.username
+                    )
+                }
+            }
+            .sheet(isPresented: $showingItemShop) {
+                ItemShopView()
             }
             .preferredColorScheme(themeManager.selectedTheme.colorScheme)
             .accentColor(themeManager.selectedTheme.accentColor)
@@ -356,6 +334,74 @@ struct ModernProfileHeaderView: View {
     }
 }
 
+struct ProfileStatsRow: View {
+    let friendsCount: Int
+    let workoutCount: Int
+    let tokens: Int
+    let onFriendsClick: () -> Void
+    let onWorkoutsClick: () -> Void
+    let onTokensClick: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // Friends
+            Button(action: onFriendsClick) {
+                VStack(spacing: 6) {
+                    Text("\(friendsCount)")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                    
+                    Text("Friends")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            
+            Divider()
+                .frame(height: 40)
+            
+            // Workouts
+            Button(action: onWorkoutsClick) {
+                VStack(spacing: 6) {
+                    Text("\(workoutCount)")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                    
+                    Text("Workouts")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            
+            Divider()
+                .frame(height: 40)
+            
+            // Tokens
+            Button(action: onTokensClick) {
+                VStack(spacing: 6) {
+                    Text("\(tokens)")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                    
+                    Text("Tokens")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.vertical, 16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
+    }
+}
+
 struct ProfileInfoCard: View {
     let icon: String
     let title: String
@@ -388,54 +434,6 @@ struct ProfileInfoCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(.systemGray4), lineWidth: 0.5)
-        )
-    }
-}
-
-struct StatsSectionModern: View {
-    let workoutCount: Int
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Stats")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            HStack(spacing: 16) {
-                ModernStatCard(title: "Workouts", value: "\(workoutCount)", icon: "dumbbell.fill", color: .blue)
-                ModernStatCard(title: "Tokens", value: "0", icon: "star.fill", color: .yellow)
-                ModernStatCard(title: "Team Rank", value: "#1", icon: "trophy.fill", color: .orange)
-            }
-        }
-    }
-}
-
-struct ModernStatCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
-            
-            Text(value)
-                .font(.title3)
-                .fontWeight(.bold)
-            
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
         )
     }
 }
@@ -476,88 +474,6 @@ struct ModernActionButton: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
-    }
-}
-
-struct ModernRecentWorkoutsSection: View {
-    let workouts: [Workout]
-    @ObservedObject private var voteService = VoteService.shared
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Recent Workouts")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            if workouts.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "dumbbell")
-                        .font(.system(size: 40))
-                        .foregroundColor(.secondary)
-                    
-                    Text("No workouts yet")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 30)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemGray6))
-                )
-            } else {
-                ForEach(workouts.prefix(5)) { workout in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(workout.liftTypeEnum.displayName)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text("\(workout.weight) lbs")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer()
-
-                        // Vote counts + time
-                        HStack(spacing: 12) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "hand.thumbsup.fill")
-                                    .foregroundColor(.green)
-                                Text("\(voteService.voteCounts[workout.id ?? ""]?.upvotes ?? 0)")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                            }
-
-                            HStack(spacing: 6) {
-                                Image(systemName: "hand.thumbsdown.fill")
-                                    .foregroundColor(.red)
-                                Text("\(voteService.voteCounts[workout.id ?? ""]?.downvotes ?? 0)")
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
-
-                            Text(workout.createdAt, style: .relative)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemBackground))
-                            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-                    )
-                }
-            }
-        }
-        .task {
-            // Preload vote counts for the recent workouts
-            let ids = workouts.compactMap { $0.id }
-            if !ids.isEmpty {
-                await voteService.fetchMultipleVoteCounts(workoutIds: ids)
-            }
-        }
     }
 }
 
