@@ -39,7 +39,7 @@ struct ProfileView: View {
                             ProfileStatsRow(
                                 friendsCount: friendsVM.friends.count,
                                 workoutCount: workoutViewModel.userWorkouts.count,
-                                tokens: 0,
+                                tokens: user.tokens,
                                 onFriendsClick: { showingFriendsList = true },
                                 onWorkoutsClick: { showingUserWorkouts = true },
                                 onTokensClick: { showingItemShop = true }
