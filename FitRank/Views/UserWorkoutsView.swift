@@ -409,6 +409,11 @@ struct WorkoutCardWithDelete: View {
     let workout: Workout
     let onTap: () -> Void
     let onDelete: () -> Void
+    @ObservedObject private var voteService = VoteService.shared
+    @State private var upvotes: Int = 0
+    @State private var downvotes: Int = 0
+    @State private var userVote: VoteType? = nil
+    @State private var isProcessingVote: Bool = false
     
     var body: some View {
         Button(action: onTap) {
@@ -446,9 +451,8 @@ struct WorkoutCardWithDelete: View {
                 // Stats
                 HStack(spacing: 20) {
                     WorkoutStatItem(icon: "eye.fill", value: "\(workout.views)", color: .secondary)
-                    // Note: Upvotes/downvotes now in subcollection
-                    WorkoutStatItem(icon: "hand.thumbsup.fill", value: "—", color: .green)
-                    WorkoutStatItem(icon: "hand.thumbsdown.fill", value: "—", color: .red)
+                    WorkoutStatItem(icon: userVote == .upvote ? "hand.thumbsup.fill" : "hand.thumbsup", value: "\(upvotes)", color: .green)
+                    WorkoutStatItem(icon: userVote == .downvote ? "hand.thumbsdown.fill" : "hand.thumbsdown", value: "\(downvotes)", color: .red)
                 }
                 
                 // Date and status
@@ -490,6 +494,30 @@ struct WorkoutCardWithDelete: View {
             .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
         }
         .buttonStyle(.plain)
+        .task {
+            if let id = workout.id {
+                await voteService.fetchVoteCounts(workoutId: id)
+                if let currentUser = try? AuthenticationManager.shared.getAuthenticatedUser() {
+                    await voteService.fetchUserVote(workoutId: id, userId: currentUser.uid)
+                }
+                if let counts = voteService.voteCounts[id] {
+                    upvotes = counts.upvotes
+                    downvotes = counts.downvotes
+                }
+                userVote = voteService.userVotes[id]
+            }
+        }
+        .onReceive(voteService.$voteCounts) { _ in
+            if let id = workout.id, let counts = voteService.voteCounts[id] {
+                upvotes = counts.upvotes
+                downvotes = counts.downvotes
+            }
+        }
+        .onReceive(voteService.$userVotes) { _ in
+            if let id = workout.id {
+                userVote = voteService.userVotes[id]
+            }
+        }
     }
     
     private func statusColor(_ status: WorkoutStatus) -> Color {

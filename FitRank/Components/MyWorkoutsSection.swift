@@ -3,6 +3,7 @@ import SwiftUI
 struct MyWorkoutsSection: View {
     @ObservedObject var workoutViewModel: WorkoutViewModel
     @ObservedObject var userViewModel: UserViewModel
+    @ObservedObject private var voteService = VoteService.shared
     @State private var showingAllWorkouts = false
     @State private var selectedWorkout: Workout?
     
@@ -65,6 +66,21 @@ struct MyWorkoutsSection: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 4)
+                }
+            }
+        }
+        .task {
+            // Preload vote counts for displayed workouts so CompactWorkoutCard updates immediately
+            let ids = workoutViewModel.userWorkouts.compactMap { $0.id }
+            if !ids.isEmpty {
+                await voteService.fetchMultipleVoteCounts(workoutIds: ids)
+            }
+        }
+        .onReceive(workoutViewModel.$userWorkouts) { newWorkouts in
+            let ids = newWorkouts.compactMap { $0.id }
+            if !ids.isEmpty {
+                Task {
+                    await voteService.fetchMultipleVoteCounts(workoutIds: ids)
                 }
             }
         }

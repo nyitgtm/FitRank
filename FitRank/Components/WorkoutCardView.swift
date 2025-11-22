@@ -93,6 +93,11 @@ struct VideoPlaceholderView: View {
 
 struct WorkoutCardView: View {
     let workout: Workout
+    @ObservedObject private var voteService = VoteService.shared
+    @State private var upvotes: Int = 0
+    @State private var downvotes: Int = 0
+    @State private var userVote: VoteType? = nil
+    @State private var isProcessingVote: Bool = false
     
     // Mock user data for development
     private var userName: String {
@@ -155,19 +160,19 @@ struct WorkoutCardView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         HStack(spacing: 8) {
-                            Image(systemName: "hand.thumbsup.fill")
+                            Image(systemName: userVote == .upvote ? "hand.thumbsup.fill" : "hand.thumbsup")
                                 .foregroundColor(.green)
-                            Text("—")
+                            Text("\(upvotes)")
                                 .font(.caption)
                                 .foregroundColor(.green)
                         }
-                        
+
                         HStack(spacing: 8) {
-                            Image(systemName: "hand.thumbsdown.fill")
+                            Image(systemName: userVote == .downvote ? "hand.thumbsdown.fill" : "hand.thumbsdown")
                                 .foregroundColor(.red)
-                            Text("—")
+                            Text("\(downvotes)")
                                 .font(.caption)
                                 .foregroundColor(.red)
                         }
@@ -177,10 +182,12 @@ struct WorkoutCardView: View {
                 // Action buttons
                 HStack(spacing: 16) {
                     Button {
-                        // Like functionality
+                        Task {
+                            await toggleVote(.upvote)
+                        }
                     } label: {
                         HStack {
-                            Image(systemName: "hand.thumbsup")
+                            Image(systemName: userVote == .upvote ? "hand.thumbsup.fill" : "hand.thumbsup")
                             Text("Like")
                         }
                         .foregroundColor(.green)
@@ -189,7 +196,8 @@ struct WorkoutCardView: View {
                         .background(Color.green.opacity(0.1))
                         .cornerRadius(20)
                     }
-                    
+                    .disabled(isProcessingVote)
+
                     Button {
                         // Comment functionality
                     } label: {
@@ -203,9 +211,26 @@ struct WorkoutCardView: View {
                         .background(Color.blue.opacity(0.1))
                         .cornerRadius(20)
                     }
-                    
+
+                    Button {
+                        Task {
+                            await toggleVote(.downvote)
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: userVote == .downvote ? "hand.thumbsdown.fill" : "hand.thumbsdown")
+                            Text("Dislike")
+                        }
+                        .foregroundColor(.red)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(20)
+                    }
+                    .disabled(isProcessingVote)
+
                     Spacer()
-                    
+
                     Button {
                         // Report functionality
                     } label: {
@@ -222,6 +247,44 @@ struct WorkoutCardView: View {
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
+        .task {
+            // Load vote counts and user vote when view appears
+            if let id = workout.id {
+                await voteService.fetchVoteCounts(workoutId: id)
+                if let currentUser = try? AuthenticationManager.shared.getAuthenticatedUser() {
+                    await voteService.fetchUserVote(workoutId: id, userId: currentUser.uid)
+                }
+                if let counts = voteService.voteCounts[id] {
+                    upvotes = counts.upvotes
+                    downvotes = counts.downvotes
+                }
+                userVote = voteService.userVotes[id]
+            }
+        }
+        .onReceive(voteService.$voteCounts) { _ in
+            if let id = workout.id, let counts = voteService.voteCounts[id] {
+                upvotes = counts.upvotes
+                downvotes = counts.downvotes
+            }
+        }
+        .onReceive(voteService.$userVotes) { _ in
+            if let id = workout.id {
+                userVote = voteService.userVotes[id]
+            }
+        }
+    }
+
+    private func toggleVote(_ type: VoteType) async {
+        guard let id = workout.id else { return }
+        isProcessingVote = true
+        do {
+            let userId = try AuthenticationManager.shared.getAuthenticatedUser().uid
+            try await voteService.toggleVote(workoutId: id, userId: userId, voteType: type)
+        } catch {
+            // fail silently for now
+            print("Vote error: \(error)")
+        }
+        isProcessingVote = false
     }
 }
 
