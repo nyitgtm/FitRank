@@ -19,21 +19,21 @@ struct ProfileView: View {
     @State private var showingItemShop = false
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                themeManager.selectedTheme.backgroundColor
-                    .ignoresSafeArea()
-                
-                if userViewModel.isLoading {
-                    ProgressView("Loading profile...")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                } else if let user = userViewModel.currentUser {
-                    ScrollView {
-                        VStack(spacing: 28) {
-                            
-                            // Header
-                            ModernProfileHeaderView(user: user, equippedBadge: equippedBadge)
+        ZStack {
+            themeManager.selectedTheme.backgroundColor
+                .ignoresSafeArea()
+            
+            if userViewModel.isLoading {
+                ProgressView("Loading profile...")
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+            } else if let user = userViewModel.currentUser {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        
+                        // Header
+                        ModernProfileHeaderView(user: user, equippedBadge: equippedBadge)
+                            .padding(.top, 8)
                             
                             // Stats Row
                             ProfileStatsRow(
@@ -78,13 +78,13 @@ struct ProfileView: View {
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 30)
-                    }
-                } else {
-                    ProgressView("Loading profile...")
-                }
-            }
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.large)
+                        }
+                        } else {
+                        ProgressView("Loading profile...")
+                        }
+                        }
+                        .navigationTitle("Profile")
+                        .navigationBarTitleDisplayMode(.large)
             .refreshable {
                 await loadUserAndWorkouts()
             }
@@ -111,8 +111,7 @@ struct ProfileView: View {
             }
             .preferredColorScheme(themeManager.selectedTheme.colorScheme)
             .accentColor(themeManager.selectedTheme.accentColor)
-        }
-    }
+            }
     
     // MARK: - Helper function
     private func loadUserAndWorkouts() async {
