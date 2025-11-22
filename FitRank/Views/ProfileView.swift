@@ -8,11 +8,13 @@ struct ProfileView: View {
     @StateObject private var userViewModel = UserViewModel()
     @StateObject private var workoutViewModel = WorkoutViewModel()
     @StateObject private var teamRepository = TeamRepository()
+    @StateObject private var friendsVM = FriendsListViewModel()
     @ObservedObject private var themeManager = ThemeManager.shared
     
     @Binding var showSignInView: Bool
     @State private var teamName: String = "Loading..."
     @State private var equippedBadge: ShopItem?
+    @State private var showingFriendsList = false
     
     var body: some View {
         NavigationView {
@@ -41,6 +43,48 @@ struct ProfileView: View {
                             
                             // Stats Section
                             StatsSectionModern(workoutCount: workoutViewModel.userWorkouts.count)
+                            
+                            // Following Button
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Social")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                
+                                Button {
+                                    showingFriendsList = true
+                                } label: {
+                                    HStack(spacing: 16) {
+                                        Image(systemName: "person.2.fill")
+                                            .font(.title2)
+                                            .foregroundColor(.green)
+                                            .frame(width: 30)
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("FOLLOWING")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            
+                                            Text("\(friendsVM.friends.count) Friends")
+                                                .font(.body)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.primary)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 16)
+                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color(.systemGray4), lineWidth: 0.5)
+                                    )
+                                }
+                            }
                             
                             // Appearance Navigation Button
                             VStack(alignment: .leading, spacing: 16) {
@@ -82,6 +126,10 @@ struct ProfileView: View {
             }
             .task {
                 await loadUserAndWorkouts()
+                friendsVM.loadFriends()
+            }
+            .sheet(isPresented: $showingFriendsList) {
+                FriendsListView()
             }
             .preferredColorScheme(themeManager.selectedTheme.colorScheme)
             .accentColor(themeManager.selectedTheme.accentColor)
