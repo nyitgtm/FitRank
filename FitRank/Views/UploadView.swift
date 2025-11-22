@@ -11,6 +11,9 @@ struct UploadView: View {
     @StateObject private var videoUploadService = VideoUploadService()
     @StateObject private var locationManager = FitRankLocationManager()
     
+    @AppStorage("hasSeenUploadDisclaimer") private var hasSeenDisclaimer = false
+    @State private var showDisclaimer = false
+    
     @State private var videoURL: URL?
     @State private var selectedLiftType: LiftType = .bench
     @State private var selectedGym: String?
@@ -249,6 +252,17 @@ struct UploadView: View {
                     selectedGym = closest.gym.id
                     print("Selected closest gym: \(closest.gym.name) (\(Int(closest.distance))m away)")
                 }
+            }
+        }
+        .sheet(isPresented: $showDisclaimer) {
+            WorkoutSafetyDisclaimerView {
+                hasSeenDisclaimer = true
+                showDisclaimer = false
+            }
+        }
+        .onAppear {
+            if !hasSeenDisclaimer {
+                showDisclaimer = true
             }
         }
     }
@@ -1160,5 +1174,125 @@ struct PlateCountBadge: View {
                 .fontWeight(.semibold)
         }
         .foregroundColor(.secondary)
+    }
+}
+
+// MARK: - Workout Safety Disclaimer
+struct WorkoutSafetyDisclaimerView: View {
+    let onAccept: () -> Void
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // Icon
+                    HStack {
+                        Spacer()
+                        Image(systemName: "figure.strengthtraining.traditional")
+                            .font(.system(size: 60))
+                            .foregroundColor(.red)
+                        Spacer()
+                    }
+                    .padding(.top, 20)
+                    
+                    // Title
+                    Text("Workout Safety Warning")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                    
+                    // Disclaimer content
+                    VStack(alignment: .leading, spacing: 16) {
+                        WorkoutDisclaimerSection(
+                            title: "Injury Risk",
+                            content: "Weight lifting and strength training carry inherent risks of serious injury including muscle tears, joint damage, and potential spinal injuries. Never lift beyond your capabilities."
+                        )
+                        
+                        WorkoutDisclaimerSection(
+                            title: "Proper Form Required",
+                            content: "Always use proper form and technique. Incorrect form can lead to severe injuries. If you're unsure about proper technique, consult a certified personal trainer or coach before attempting any lift."
+                        )
+                        
+                        WorkoutDisclaimerSection(
+                            title: "Use Spotters & Safety Equipment",
+                            content: "For heavy lifts, always use a spotter. Use safety bars, clips, and proper equipment. Never attempt maximum lifts alone or without proper safety measures in place."
+                        )
+                        
+                        WorkoutDisclaimerSection(
+                            title: "Medical Clearance",
+                            content: "Consult with a healthcare provider before beginning any new exercise program, especially if you have pre-existing medical conditions, injuries, or health concerns."
+                        )
+                        
+                        WorkoutDisclaimerSection(
+                            title: "Listen to Your Body",
+                            content: "Stop immediately if you experience sharp pain, dizziness, unusual fatigue, or any discomfort. Pain is a warning signal. Seek medical attention if symptoms persist."
+                        )
+                        
+                        WorkoutDisclaimerSection(
+                            title: "No Liability",
+                            content: "FitRank is for tracking purposes only. We are not responsible for any injuries or damages. You assume all risks associated with your workouts."
+                        )
+                    }
+                    
+                    // Warning note
+                    HStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                            .font(.title2)
+                        Text("Safety First: Form over Ego")
+                            .font(.headline)
+                            .foregroundColor(.orange)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.orange.opacity(0.1))
+                    .cornerRadius(12)
+                    
+                    // Accept button
+                    Button(action: onAccept) {
+                        Text("I Understand the Risks")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.red)
+                            .cornerRadius(12)
+                    }
+                    .padding(.top, 20)
+                    
+                    Spacer(minLength: 40)
+                }
+                .padding()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .interactiveDismissDisabled()
+    }
+}
+
+struct WorkoutDisclaimerSection: View {
+    let title: String
+    let content: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "hand.raised.fill")
+                    .foregroundColor(.red)
+                Text(title)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+            }
+            
+            Text(content)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
     }
 }
