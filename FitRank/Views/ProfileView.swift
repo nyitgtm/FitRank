@@ -433,6 +433,7 @@ struct ModernActionButton: View {
 
 struct ModernRecentWorkoutsSection: View {
     let workouts: [Workout]
+    @ObservedObject private var voteService = VoteService.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -467,10 +468,31 @@ struct ModernRecentWorkoutsSection: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
+
                         Spacer()
-                        Text(workout.createdAt, style: .relative)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+
+                        // Vote counts + time
+                        HStack(spacing: 12) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "hand.thumbsup.fill")
+                                    .foregroundColor(.green)
+                                Text("\(voteService.voteCounts[workout.id ?? ""]?.upvotes ?? 0)")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                            }
+
+                            HStack(spacing: 6) {
+                                Image(systemName: "hand.thumbsdown.fill")
+                                    .foregroundColor(.red)
+                                Text("\(voteService.voteCounts[workout.id ?? ""]?.downvotes ?? 0)")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+
+                            Text(workout.createdAt, style: .relative)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                     .padding()
                     .background(
@@ -479,6 +501,13 @@ struct ModernRecentWorkoutsSection: View {
                             .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
                     )
                 }
+            }
+        }
+        .task {
+            // Preload vote counts for the recent workouts
+            let ids = workouts.compactMap { $0.id }
+            if !ids.isEmpty {
+                await voteService.fetchMultipleVoteCounts(workoutIds: ids)
             }
         }
     }

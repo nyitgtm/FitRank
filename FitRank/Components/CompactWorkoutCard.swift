@@ -9,7 +9,7 @@ struct CompactWorkoutCard: View {
     let workout: Workout
     let onTap: () -> Void
     
-    @StateObject private var voteService = VoteService.shared
+    @ObservedObject private var voteService = VoteService.shared
     @State private var voteCounts: VoteCounts = VoteCounts(upvotes: 0, downvotes: 0)
     
     private var observedVoteCounts: VoteCounts? {
