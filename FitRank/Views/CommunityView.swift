@@ -30,25 +30,50 @@ enum TeamFilter: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Filter Types
+
+enum CommunityFilterType: String, CaseIterable, Identifiable {
+    case all = "All"
+    case following = "Following"
+    case teams = "Teams"
+    
+    var id: String { rawValue }
+}
+
 // MARK: - Community View
 
 struct CommunityView: View {
     // SWAP: we now use the Firebase-backed VM
     @StateObject private var vm = CommunityVM_Firebase()
+    @StateObject private var friendsVM = FriendsListViewModel() // Add FriendsListViewModel
     @State private var commentingPost: CommunityPost?
-    @State private var showNotifications = false
-
-    @State private var showFilter = false
-    @State private var hoveredTeam: TeamFilter? = nil
-    @State private var teamFilter: TeamFilter = .all
+    
+    // Filters
+    @State private var selectedFilter: CommunityFilterType = .all
+    @State private var selectedTeam: TeamFilter = .all
+    @State private var showTeamFilter = false
+    
     @State private var searchText: String = ""
 
     // Filtered posts based on team + search logic
     private var filteredPosts: [CommunityPost] {
         var items = vm.posts
 
-        if teamFilter != .all {
-            items = items.filter { $0.teamTag?.localizedCaseInsensitiveContains(teamFilter.rawValue) == true }
+        // 1. Top-level filter logic
+        switch selectedFilter {
+        case .all:
+            break // Show everything
+        case .following:
+            // Filter by following list
+            let friendIds = Set(friendsVM.friends.map { $0.userId })
+            // Also include own posts? Usually yes, or maybe not. Let's include friends only for now.
+            // If you want to include yourself: friendIds.insert(Auth.auth().currentUser?.uid ?? "")
+            items = items.filter { friendIds.contains($0.authorId) }
+        case .teams:
+            // If "Teams" is selected, we apply the specific team filter
+            if selectedTeam != .all {
+                items = items.filter { $0.teamTag?.localizedCaseInsensitiveContains(selectedTeam.rawValue) == true }
+            }
         }
 
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -70,108 +95,81 @@ struct CommunityView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
-            // Header
-            HStack {
-                Spacer()
                 
-                // Notifications button with badge
-                Button {
-                    showNotifications = true
-                } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "bell.fill")
-                            .font(.system(size: 20))
-                        
-                        if vm.unreadCount > 0 {
-                            Text("\(vm.unreadCount)")
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .frame(minWidth: 16, minHeight: 16)
-                                .background(Color.red)
-                                .clipShape(Circle())
-                                .offset(x: 8, y: -8)
+                // New Filter Bar
+                CommunityFilterBar(
+                    selectedFilter: $selectedFilter,
+                    selectedTeam: $selectedTeam,
+                    showTeamFilter: $showTeamFilter
+                )
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+
+                // Search bar
+                SearchBar(text: $searchText)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 6)
+
+                Divider()
+
+                // Feed
+                Group {
+                    if vm.isLoading {
+                        Spacer()
+                        ProgressView("Loading community...")
+                        Spacer()
+                    } else if filteredPosts.isEmpty {
+                        VStack(spacing: 10) {
+                            Image(systemName: "person.3.fill")
+                                .font(.system(size: 44))
+                                .foregroundColor(.secondary)
+                            Text("No posts match your filter")
+                                .font(.headline)
+                            Text("Try a different team or search.")
+                                .foregroundColor(.secondary)
                         }
-                    }
-                }
-                
-                Button {
-                    vm.showComposer = true
-                } label: {
-                    Label("Post", systemImage: "square.and.pencil")
-                        .font(.subheadline)
-                }
-                Button {
-                    showFilter.toggle()
-                } label: {
-                    Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
-                        .labelStyle(.titleAndIcon)
-                        .font(.subheadline)
-                }
-                .popover(isPresented: $showFilter, arrowEdge: .top) {
-                    FilterPopover(
-                        selected: teamFilter,
-                        hovered: $hoveredTeam,
-                        onSelect: { sel in
-                            teamFilter = sel
-                            showFilter = false
-                        }
-                    )
-                    .frame(maxWidth: 280)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 8)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 6)
-
-            // Search bar
-            SearchBar(text: $searchText)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 6)
-
-            Divider()
-
-            // Feed
-            Group {
-                if vm.isLoading {
-                    Spacer()
-                    ProgressView("Loading community...")
-                    Spacer()
-                } else if filteredPosts.isEmpty {
-                    VStack(spacing: 10) {
-                        Image(systemName: "person.3.fill")
-                            .font(.system(size: 44))
-                            .foregroundColor(.secondary)
-                        Text("No posts match your filter")
-                            .font(.headline)
-                        Text("Try a different team or search.")
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.top, 40)
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(filteredPosts) { post in
-                                PostCardView(
-                                    post: post,
-                                    likeAction: { vm.toggleLike(post) },
-                                    commentAction: { commentingPost = post },
-                                    deleteAction: { vm.deletePost(post) }
-                                )
-                                .padding(.horizontal, 16)
+                        .padding(.top, 40)
+                        Spacer()
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 16) {
+                                ForEach(filteredPosts) { post in
+                                    PostCardView(
+                                        post: post,
+                                        likeAction: { vm.toggleLike(post) },
+                                        commentAction: { commentingPost = post },
+                                        deleteAction: { vm.deletePost(post) }
+                                    )
+                                    .padding(.horizontal, 16)
+                                }
                             }
+                            .padding(.vertical, 16)
+                            // Add extra padding at bottom for FAB
+                            .padding(.bottom, 80)
                         }
-                        .padding(.vertical, 16)
                     }
                 }
             }
-        }
+            
+            // Sticky FAB
+            Button {
+                vm.showComposer = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.title2.weight(.semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 56, height: 56)
+                    .background(Color.blue)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 4)
+            }
+            .padding(.trailing, 20)
+            .padding(.bottom, 20)
         }
         .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         // Temporary upload success banner
         .overlay(alignment: .top) {
             if vm.postUploadSuccess {
@@ -192,7 +190,6 @@ struct CommunityView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
 
         // Composer Sheet
         .sheet(isPresented: $vm.showComposer) {
@@ -212,68 +209,100 @@ struct CommunityView: View {
             .presentationDetents([.medium, .large])
         }
         
-        // Notifications Sheet
-        .sheet(isPresented: $showNotifications) {
-            NotificationsSheet(
-                notifications: vm.notifications,
-                onTapNotification: { notification in
-                    vm.markNotificationAsRead(notification)
-                },
-                onMarkAllRead: {
-                    vm.markAllNotificationsAsRead()
+        // Notifications Sheet (Removed from here, moved to HomeView)
+        .onAppear {
+            // Load friends when view appears so we have the list for filtering
+            friendsVM.loadFriends()
+        }
+    }
+}
+
+// MARK: - Community Filter Bar
+
+struct CommunityFilterBar: View {
+    @Binding var selectedFilter: CommunityFilterType
+    @Binding var selectedTeam: TeamFilter
+    @Binding var showTeamFilter: Bool
+    
+    var body: some View {
+        // Centered, equal-width buttons
+        HStack(spacing: 10) {
+            ForEach(CommunityFilterType.allCases) { filter in
+                Button {
+                    withAnimation(.spring()) {
+                        selectedFilter = filter
+                        if filter == .teams {
+                            showTeamFilter.toggle()
+                        } else {
+                            showTeamFilter = false
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        // Icons for specific filters
+                        if filter == .teams {
+                            Image(systemName: "person.3.fill")
+                        }
+                        
+                        Text(filter.rawValue)
+                        
+                        // Chevron for teams if selected
+                        if filter == .teams && selectedFilter == .teams {
+                            Image(systemName: showTeamFilter ? "chevron.up" : "chevron.down")
+                                .font(.caption)
+                        }
+                    }
+                    .font(.subheadline)
+                    .fontWeight(selectedFilter == filter ? .semibold : .medium)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        Capsule()
+                            .fill(selectedFilter == filter ? Color.blue : Color(.secondarySystemBackground))
+                    )
+                    .foregroundColor(selectedFilter == filter ? .white : .primary)
                 }
-            )
-            .presentationDetents([.medium, .large])
+            }
+        }
+        .padding(.horizontal, 16)
+        
+        // Expanded Team Filter (only if Teams is selected and expanded)
+        if selectedFilter == .teams && showTeamFilter {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(TeamFilter.allCases) { team in
+                        Button {
+                            withAnimation {
+                                selectedTeam = team
+                            }
+                        } label: {
+                            Text(team.rawValue)
+                                .font(.caption)
+                                .fontWeight(selectedTeam == team ? .semibold : .regular)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(selectedTeam == team ? team.color : Color.clear)
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(team.accent, lineWidth: selectedTeam == team ? 1 : 0)
+                                        )
+                                )
+                                .foregroundColor(selectedTeam == team ? team.accent : .primary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+            }
+            .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
 }
 
 // MARK: - Filter Popover
 
-private struct FilterPopover: View {
-    let selected: TeamFilter
-    @Binding var hovered: TeamFilter?
-    var onSelect: (TeamFilter) -> Void
-
-    private let options: [TeamFilter] = [.all, .killaGorilla, .darkSharks, .regalEagle]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Filter Teams")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.top, 4)
-
-            ForEach(options) { option in
-                Button {
-                    onSelect(option)
-                } label: {
-                    HStack {
-                        Text(option.rawValue)
-                            .font(.subheadline)
-                            .fontWeight(option == selected ? .semibold : .regular)
-                        Spacer()
-                        if option == selected {
-                            Image(systemName: "checkmark").font(.footnote)
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(
-                        (hovered == option ? option.color : Color.clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    )
-                    .contentShape(Rectangle())
-                }
-                .onHover { isHovering in
-                    hovered = isHovering ? option : nil
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-}
 
 // MARK: - Search Bar
 
