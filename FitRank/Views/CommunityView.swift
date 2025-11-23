@@ -182,12 +182,13 @@ struct CommunityView: View {
                         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
                             // Simple scroll direction detection
                             if value < lastScrollOffset - 10 {
-                                // Scrolling down -> Collapse
+                                // Scrolling down -> Collapse filter buttons and hide filter bar
                                 withAnimation(.spring()) {
                                     isCollapsed = true
+                                    showFilters = false
                                 }
                             } else if value > lastScrollOffset + 10 {
-                                // Scrolling up -> Expand
+                                // Scrolling up -> Expand filter buttons (but keep filter bar hidden)
                                 withAnimation(.spring()) {
                                     isCollapsed = false
                                 }
@@ -281,6 +282,14 @@ struct CommunityView: View {
         .onAppear {
             // Load friends when view appears so we have the list for filtering
             friendsVM.loadFriends()
+        }
+        .onChange(of: selectedFilter) { _, newFilter in
+            // Auto-collapse filters when a non-teams filter is selected
+            if newFilter != .teams {
+                withAnimation(.spring()) {
+                    showFilters = false
+                }
+            }
         }
     }
 }

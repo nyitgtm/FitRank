@@ -37,6 +37,7 @@ struct CustomVideoPlayer: UIViewRepresentable {
 struct TikTokFeedView: View {
     @StateObject private var voteService = VoteService.shared
     @StateObject private var gymRepository = GymRepository()
+    @StateObject private var friendsVM = FriendsListViewModel()
     @State private var workouts: [Workout] = []
     @State private var currentIndex = 0
     @State private var isLoading = true
@@ -51,21 +52,29 @@ struct TikTokFeedView: View {
     
     // Filtered workouts
     private var filteredWorkouts: [Workout] {
+        var filtered: [Workout]
+        
         switch selectedFilter {
         case .all:
-            return workouts
+            filtered = workouts
+        case .following:
+            let friendIds = Set(friendsVM.friends.map { $0.userId })
+            filtered = workouts.filter { friendIds.contains($0.userId) }
         case .squat:
-            return workouts.filter { $0.liftType == "squat" }
+            filtered = workouts.filter { $0.liftType == "squat" }
         case .bench:
-            return workouts.filter { $0.liftType == "bench" }
+            filtered = workouts.filter { $0.liftType == "bench" }
         case .deadlift:
-            return workouts.filter { $0.liftType == "deadlift" }
+            filtered = workouts.filter { $0.liftType == "deadlift" }
         case .gym:
             if let gymId = selectedGymFilter {
-                return workouts.filter { $0.gymId == gymId }
+                filtered = workouts.filter { $0.gymId == gymId }
+            } else {
+                filtered = workouts
             }
-            return workouts
         }
+        
+        return filtered
     }
     
     var selectedGymName: String {
@@ -162,6 +171,9 @@ struct TikTokFeedView: View {
             await loadWorkouts()
             await gymRepository.fetchGyms()
         }
+        .onAppear {
+            friendsVM.loadFriends()
+        }
         .onChange(of: currentIndex) { _, newIndex in
             if newIndex < filteredWorkouts.count {
                 Task {
@@ -172,6 +184,10 @@ struct TikTokFeedView: View {
         .onChange(of: selectedFilter) { _, _ in
             // Reset to first workout when filter changes
             currentIndex = 0
+            // Auto-collapse filters when a filter is selected
+            withAnimation(.spring()) {
+                showFilters = false
+            }
         }
     }
     

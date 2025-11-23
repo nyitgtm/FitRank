@@ -75,7 +75,8 @@ struct UserWorkoutsView: View {
     
     private var filteredWorkouts: [Workout] {
         switch selectedFilter {
-        case .all:
+        case .all, .following:
+            // Following filter doesn't apply in user-specific workout view
             return workoutViewModel.userWorkouts
         case .squat:
             return workouts(for: "squat")
@@ -649,6 +650,7 @@ struct WorkoutStatItem: View {
 // MARK: - Workout Filters
 enum WorkoutFilterType: String, CaseIterable, Identifiable {
     case all = "All"
+    case following = "Following"
     case squat = "Squat"
     case bench = "Bench"
     case deadlift = "Deadlift"
@@ -659,6 +661,7 @@ enum WorkoutFilterType: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .all: return "dumbbell.fill"
+        case .following: return "person.2.fill"
         case .squat: return "figure.strengthtraining.traditional"
         case .bench: return "figure.strengthtraining.functional"
         case .deadlift: return "figure.core.training"
