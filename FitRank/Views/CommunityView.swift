@@ -38,6 +38,22 @@ enum CommunityFilterType: String, CaseIterable, Identifiable {
     case teams = "Teams"
     
     var id: String { rawValue }
+    
+    var icon: String {
+        switch self {
+        case .all: return "globe"
+        case .following: return "person.2.fill"
+        case .teams: return "person.3.fill"
+        }
+    }
+}
+
+// MARK: - Scroll Offset Preference Key
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
 }
 
 // MARK: - Community View
@@ -52,6 +68,8 @@ struct CommunityView: View {
     @State private var selectedFilter: CommunityFilterType = .all
     @State private var selectedTeam: TeamFilter = .all
     @State private var showTeamFilter = false
+    @State private var isCollapsed = false
+    @State private var lastScrollOffset: CGFloat = 0
     
     @State private var searchText: String = ""
 
@@ -102,7 +120,8 @@ struct CommunityView: View {
                 CommunityFilterBar(
                     selectedFilter: $selectedFilter,
                     selectedTeam: $selectedTeam,
-                    showTeamFilter: $showTeamFilter
+                    showTeamFilter: $showTeamFilter,
+                    isCollapsed: $isCollapsed
                 )
                 .padding(.top, 8)
                 .padding(.bottom, 8)
@@ -134,6 +153,13 @@ struct CommunityView: View {
                         Spacer()
                     } else {
                         ScrollView {
+                            // Scroll Reader for offset
+                            GeometryReader { geo in
+                                Color.clear
+                                    .preference(key: ScrollOffsetPreferenceKey.self, value: geo.frame(in: .global).minY)
+                            }
+                            .frame(height: 0)
+                            
                             LazyVStack(spacing: 16) {
                                 ForEach(filteredPosts) { post in
                                     PostCardView(
@@ -148,6 +174,21 @@ struct CommunityView: View {
                             .padding(.vertical, 16)
                             // Add extra padding at bottom for FAB
                             .padding(.bottom, 80)
+                        }
+                        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                            // Simple scroll direction detection
+                            if value < lastScrollOffset - 10 {
+                                // Scrolling down -> Collapse
+                                withAnimation(.spring()) {
+                                    isCollapsed = true
+                                }
+                            } else if value > lastScrollOffset + 10 {
+                                // Scrolling up -> Expand
+                                withAnimation(.spring()) {
+                                    isCollapsed = false
+                                }
+                            }
+                            lastScrollOffset = value
                         }
                     }
                 }
@@ -223,6 +264,7 @@ struct CommunityFilterBar: View {
     @Binding var selectedFilter: CommunityFilterType
     @Binding var selectedTeam: TeamFilter
     @Binding var showTeamFilter: Bool
+    @Binding var isCollapsed: Bool
     
     var body: some View {
         // Centered, equal-width buttons
@@ -231,6 +273,7 @@ struct CommunityFilterBar: View {
                 Button {
                     withAnimation(.spring()) {
                         selectedFilter = filter
+                        
                         if filter == .teams {
                             showTeamFilter.toggle()
                         } else {
@@ -238,24 +281,27 @@ struct CommunityFilterBar: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: isCollapsed ? 0 : 6) {
                         // Icons for specific filters
-                        if filter == .teams {
-                            Image(systemName: "person.3.fill")
+                        Image(systemName: filter.icon)
+                            .font(isCollapsed ? .body : .subheadline)
+                        
+                        if !isCollapsed {
+                            Text(filter.rawValue)
+                                .font(.subheadline)
+                                .transition(.opacity.combined(with: .move(edge: .trailing)))
                         }
                         
-                        Text(filter.rawValue)
-                        
                         // Chevron for teams if selected
-                        if filter == .teams && selectedFilter == .teams {
+                        if filter == .teams && selectedFilter == .teams && !isCollapsed {
                             Image(systemName: showTeamFilter ? "chevron.up" : "chevron.down")
                                 .font(.caption)
                         }
                     }
-                    .font(.subheadline)
                     .fontWeight(selectedFilter == filter ? .semibold : .medium)
                     .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, isCollapsed ? 16 : 0)
+                    .frame(maxWidth: isCollapsed ? nil : .infinity)
                     .background(
                         Capsule()
                             .fill(selectedFilter == filter ? Color.blue : Color(.secondarySystemBackground))
@@ -265,6 +311,7 @@ struct CommunityFilterBar: View {
             }
         }
         .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, alignment: .center)
         
         // Expanded Team Filter (only if Teams is selected and expanded)
         if selectedFilter == .teams && showTeamFilter {
@@ -274,6 +321,7 @@ struct CommunityFilterBar: View {
                         Button {
                             withAnimation {
                                 selectedTeam = team
+                                showTeamFilter = false
                             }
                         } label: {
                             Text(team.rawValue)
