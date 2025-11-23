@@ -677,41 +677,41 @@ struct WorkoutFilterBar: View {
     var onGymTap: (() -> Void)?
     
     var body: some View {
-        HStack(spacing: 10) {
-            ForEach(WorkoutFilterType.allCases) { filter in
-                Button {
-                    if filter == .gym {
-                        selectedFilter = filter
-                        onGymTap?()
-                    } else {
-                        withAnimation(.spring()) {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(WorkoutFilterType.allCases) { filter in
+                    Button {
+                        if filter == .gym {
                             selectedFilter = filter
+                            onGymTap?()
+                        } else {
+                            withAnimation(.spring()) {
+                                selectedFilter = filter
+                            }
                         }
-                    }
-                } label: {
-                    HStack(spacing: isCollapsed ? 0 : 6) {
-                        Image(systemName: filter.icon)
-                            .font(isCollapsed ? .footnote : .caption)
-                        
-                        if !isCollapsed {
-                            Text(filter == .gym ? selectedGymName : filter.rawValue)
-                                .font(.caption)
-                                .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    } label: {
+                        HStack(spacing: isCollapsed ? 0 : 6) {
+                            Image(systemName: filter.icon)
+                                .font(isCollapsed ? .footnote : .caption)
+                            
+                            if !isCollapsed {
+                                Text(filter == .gym ? selectedGymName : filter.rawValue)
+                                    .font(.caption)
+                                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+                            }
                         }
+                        .fontWeight(selectedFilter == filter ? .semibold : .medium)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, isCollapsed ? 12 : 16)
+                        .background(
+                            Capsule()
+                                .fill(selectedFilter == filter ? Color.blue : Color(.secondarySystemBackground))
+                        )
+                        .foregroundColor(selectedFilter == filter ? .white : .primary)
                     }
-                    .fontWeight(selectedFilter == filter ? .semibold : .medium)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, isCollapsed ? 16 : 0)
-                    .frame(maxWidth: isCollapsed ? nil : .infinity)
-                    .background(
-                        Capsule()
-                            .fill(selectedFilter == filter ? Color.blue : Color(.secondarySystemBackground))
-                    )
-                    .foregroundColor(selectedFilter == filter ? .white : .primary)
                 }
             }
+            .padding(.horizontal, 16)
         }
-        .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
