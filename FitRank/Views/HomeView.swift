@@ -16,6 +16,10 @@ struct HomeView: View {
     @State private var showingFullScreenHeatmap = false
     @State private var showingItemShop = false
     @State private var hasLoadedGyms = false
+    
+    // Community Notifications
+    @StateObject private var communityVM = CommunityVM_Firebase()
+    @State private var showingCommunityNotifications = false
 
     var body: some View {
         
@@ -130,12 +134,33 @@ struct HomeView: View {
                             }
                         }
                         
+                        // Community Notifications Bell
+                        Button {
+                            showingCommunityNotifications = true
+                        } label: {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: "bell.fill")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                
+                                if communityVM.unreadCount > 0 {
+                                    Text("\(communityVM.unreadCount)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .frame(minWidth: 16, minHeight: 16)
+                                        .background(Color.red)
+                                        .clipShape(Circle())
+                                        .offset(x: 8, y: -8)
+                                }
+                            }
+                        }
+                        
                         // Friend Requests Bell with badge
                         Button {
                             showingFriendRequests = true
                         } label: {
                             ZStack(alignment: .topTrailing) {
-                                Image(systemName: friendRequestVM.unreadCount > 0 ? "bell.badge.fill" : "bell.fill")
+                                Image(systemName: friendRequestVM.unreadCount > 0 ? "person.2.fill" : "person.2")
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(friendRequestVM.unreadCount > 0 ? .blue : .secondary)
                                 
@@ -179,6 +204,19 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingItemShop) {
             ItemShopView()
+        }
+        // Community Notifications Sheet
+        .sheet(isPresented: $showingCommunityNotifications) {
+            NotificationsSheet(
+                notifications: communityVM.notifications,
+                onTapNotification: { notification in
+                    communityVM.markNotificationAsRead(notification)
+                },
+                onMarkAllRead: {
+                    communityVM.markAllNotificationsAsRead()
+                }
+            )
+            .presentationDetents([.medium, .large])
         }
         .fullScreenCover(isPresented: $showingFullScreenHeatmap) {
             FullScreenHeatmapView(isPresented: $showingFullScreenHeatmap, gymRepository: gymRepository)

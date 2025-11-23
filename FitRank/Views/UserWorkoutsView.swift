@@ -12,6 +12,16 @@ struct UserWorkoutsView: View {
     @State private var selectedWorkout: Workout?
     @StateObject private var gymRepository = GymRepository()
     
+    // Filters
+    @State private var selectedFilter: WorkoutFilterType = .all
+    @State private var showFilters = false
+    @State private var isCollapsed = false
+    @State private var lastScrollOffset: CGFloat = 0
+    
+    // Gym Filter
+    @State private var selectedGymFilter: String?
+    @State private var showingGymPicker = false
+    
     // Computed personal records
     private var bestSquat: Int? {
         workouts(for: "squat").max(by: { $0.weight < $1.weight })?.weight
@@ -63,6 +73,33 @@ struct UserWorkoutsView: View {
         workoutViewModel.userWorkouts.filter { $0.liftType == liftType }
     }
     
+    private var filteredWorkouts: [Workout] {
+        switch selectedFilter {
+        case .all, .following:
+            // Following filter doesn't apply in user-specific workout view
+            return workoutViewModel.userWorkouts
+        case .squat:
+            return workouts(for: "squat")
+        case .bench:
+            return workouts(for: "bench")
+        case .deadlift:
+            return workouts(for: "deadlift")
+        case .gym:
+            if let gymId = selectedGymFilter {
+                return workoutViewModel.userWorkouts.filter { $0.gymId == gymId }
+            }
+            return workoutViewModel.userWorkouts
+        }
+    }
+    
+    var selectedGymName: String {
+        if let gymId = selectedGymFilter,
+           let gym = gymRepository.gyms.first(where: { $0.id == gymId }) {
+            return gym.name
+        }
+        return "Gym"
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -95,7 +132,27 @@ struct UserWorkoutsView: View {
                     }
                 } else {
                     ScrollView {
+                        // Scroll Reader
+                        GeometryReader { geo in
+                            Color.clear
+                                .preference(key: ScrollOffsetPreferenceKey.self, value: geo.frame(in: .global).minY)
+                        }
+                        .frame(height: 0)
+                        
                         VStack(spacing: 16) {
+                            // Filter Bar (Collapsible)
+                            if showFilters {
+                                WorkoutFilterBar(
+                                    selectedFilter: $selectedFilter,
+                                    isCollapsed: $isCollapsed,
+                                    selectedGymName: selectedGymName,
+                                    onGymTap: {
+                                        showingGymPicker = true
+                                    }
+                                )
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                            }
+                            
                             // Personal Records (S, B, D)
                             PersonalRecordsCard(
                                 squat: bestSquat,
@@ -116,7 +173,7 @@ struct UserWorkoutsView: View {
                             .padding(.horizontal, 20)
                             
                             // Workout cards with delete
-                            ForEach(workoutViewModel.userWorkouts) { workout in
+                            ForEach(filteredWorkouts) { workout in
                                 WorkoutCardWithDelete(
                                     workout: workout,
                                     onTap: {
@@ -135,11 +192,40 @@ struct UserWorkoutsView: View {
                         }
                         .padding(.vertical, 16)
                     }
+                    .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                        if value < lastScrollOffset - 10 {
+                            withAnimation(.spring()) { isCollapsed = true }
+                        } else if value > lastScrollOffset + 10 {
+                            withAnimation(.spring()) { isCollapsed = false }
+                        }
+                        lastScrollOffset = value
+                    }
                 }
             }
-            .navigationTitle("My Workouts")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Button {
+                        withAnimation(.spring()) {
+                            showFilters.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("My Workouts")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(width: 24, height: 24)
+                                .background(Color.blue)
+                                .clipShape(Circle())
+                                .rotationEffect(Angle(degrees: showFilters ? 180 : 0))
+                        }
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
@@ -147,6 +233,12 @@ struct UserWorkoutsView: View {
                     .fontWeight(.semibold)
                 }
             }
+        }
+        .sheet(isPresented: $showingGymPicker) {
+            GymPickerSheet(
+                gyms: gymRepository.gyms,
+                selectedGym: $selectedGymFilter
+            )
         }
         .sheet(item: $selectedWorkout) { workout in
             WorkoutDetailView(workout: workout)
@@ -553,4 +645,73 @@ struct WorkoutStatItem: View {
         userName: "John Doe",
         userUsername: "johndoe"
     )
+}
+
+// MARK: - Workout Filters
+enum WorkoutFilterType: String, CaseIterable, Identifiable {
+    case all = "All"
+    case following = "Following"
+    case squat = "Squat"
+    case bench = "Bench"
+    case deadlift = "Deadlift"
+    case gym = "Gym"
+    
+    var id: String { rawValue }
+    
+    var icon: String {
+        switch self {
+        case .all: return "dumbbell.fill"
+        case .following: return "person.2.fill"
+        case .squat: return "figure.strengthtraining.traditional"
+        case .bench: return "figure.strengthtraining.functional"
+        case .deadlift: return "figure.core.training"
+        case .gym: return "mappin.circle.fill"
+        }
+    }
+}
+
+struct WorkoutFilterBar: View {
+    @Binding var selectedFilter: WorkoutFilterType
+    @Binding var isCollapsed: Bool
+    var selectedGymName: String = "Gym"
+    var onGymTap: (() -> Void)?
+    
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(WorkoutFilterType.allCases) { filter in
+                    Button {
+                        if filter == .gym {
+                            selectedFilter = filter
+                            onGymTap?()
+                        } else {
+                            withAnimation(.spring()) {
+                                selectedFilter = filter
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: isCollapsed ? 0 : 6) {
+                            Image(systemName: filter.icon)
+                                .font(isCollapsed ? .footnote : .caption)
+                            
+                            if !isCollapsed {
+                                Text(filter == .gym ? selectedGymName : filter.rawValue)
+                                    .font(.caption)
+                                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+                            }
+                        }
+                        .fontWeight(selectedFilter == filter ? .semibold : .medium)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, isCollapsed ? 12 : 16)
+                        .background(
+                            Capsule()
+                                .fill(selectedFilter == filter ? Color.blue : Color(.secondarySystemBackground))
+                        )
+                        .foregroundColor(selectedFilter == filter ? .white : .primary)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
 }
