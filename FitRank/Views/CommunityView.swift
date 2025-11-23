@@ -68,6 +68,7 @@ struct CommunityView: View {
     @State private var selectedFilter: CommunityFilterType = .all
     @State private var selectedTeam: TeamFilter = .all
     @State private var showTeamFilter = false
+    @State private var showFilters = false
     @State private var isCollapsed = false
     @State private var lastScrollOffset: CGFloat = 0
     
@@ -116,15 +117,18 @@ struct CommunityView: View {
         ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
                 
-                // New Filter Bar
-                CommunityFilterBar(
-                    selectedFilter: $selectedFilter,
-                    selectedTeam: $selectedTeam,
-                    showTeamFilter: $showTeamFilter,
-                    isCollapsed: $isCollapsed
-                )
-                .padding(.top, 8)
-                .padding(.bottom, 8)
+                // New Filter Bar (Collapsible)
+                if showFilters {
+                    CommunityFilterBar(
+                        selectedFilter: $selectedFilter,
+                        selectedTeam: $selectedTeam,
+                        showTeamFilter: $showTeamFilter,
+                        isCollapsed: $isCollapsed
+                    )
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 // Search bar
                 SearchBar(text: $searchText)
@@ -211,6 +215,29 @@ struct CommunityView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Button {
+                    withAnimation(.spring()) {
+                        showFilters.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Community")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 24, height: 24)
+                            .background(Color.blue)
+                            .clipShape(Circle())
+                            .rotationEffect(Angle(degrees: showFilters ? 180 : 0))
+                    }
+                }
+            }
+        }
         // Temporary upload success banner
         .overlay(alignment: .top) {
             if vm.postUploadSuccess {

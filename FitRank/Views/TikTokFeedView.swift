@@ -36,50 +36,142 @@ struct CustomVideoPlayer: UIViewRepresentable {
 
 struct TikTokFeedView: View {
     @StateObject private var voteService = VoteService.shared
+    @StateObject private var gymRepository = GymRepository()
     @State private var workouts: [Workout] = []
     @State private var currentIndex = 0
     @State private var isLoading = true
     
+    // Filters
+    @State private var selectedFilter: WorkoutFilterType = .all
+    @State private var showFilters = false
+    @State private var selectedGymFilter: String?
+    @State private var showingGymPicker = false
+    
     private let firebaseService = FirebaseService.shared
+    
+    // Filtered workouts
+    private var filteredWorkouts: [Workout] {
+        switch selectedFilter {
+        case .all:
+            return workouts
+        case .squat:
+            return workouts.filter { $0.liftType == "squat" }
+        case .bench:
+            return workouts.filter { $0.liftType == "bench" }
+        case .deadlift:
+            return workouts.filter { $0.liftType == "deadlift" }
+        case .gym:
+            if let gymId = selectedGymFilter {
+                return workouts.filter { $0.gymId == gymId }
+            }
+            return workouts
+        }
+    }
+    
+    var selectedGymName: String {
+        if let gymId = selectedGymFilter,
+           let gym = gymRepository.gyms.first(where: { $0.id == gymId }) {
+            return gym.name
+        }
+        return "Gym"
+    }
     
     var body: some View {
         ZStack {
-            if isLoading {
-                ProgressView("Loading workouts...")
-            } else if workouts.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "dumbbell")
-                        .font(.system(size: 60))
-                        .foregroundColor(.secondary)
-                    Text("No workouts yet")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    Text("Be the first to upload!")
-                        .foregroundColor(.secondary)
+            // Main content
+            ZStack {
+                if isLoading {
+                    ProgressView("Loading workouts...")
+                } else if filteredWorkouts.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "dumbbell")
+                            .font(.system(size: 60))
+                            .foregroundColor(.secondary)
+                        Text(filteredWorkouts.isEmpty && !workouts.isEmpty ? "No workouts match filter" : "No workouts yet")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        Text(filteredWorkouts.isEmpty && !workouts.isEmpty ? "Try a different filter" : "Be the first to upload!")
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    TabView(selection: $currentIndex) {
+                        ForEach(Array(filteredWorkouts.enumerated()), id: \.element.id) { index, workout in
+                            WorkoutFeedCard(
+                                workout: workout,
+                                voteService: voteService
+                            )
+                            .tag(index)
+                            .id(workout.id) // Force recreate on workout change
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
                 }
-            } else {
-                TabView(selection: $currentIndex) {
-                    ForEach(Array(workouts.enumerated()), id: \.element.id) { index, workout in
-                        WorkoutFeedCard(
-                            workout: workout,
-                            voteService: voteService
-                        )
-                        .tag(index)
-                        .id(workout.id) // Force recreate on workout change
+            }
+            
+            // Filter bar overlay at top
+            VStack {
+                if showFilters {
+                    WorkoutFilterBar(
+                        selectedFilter: $selectedFilter,
+                        isCollapsed: .constant(false),
+                        selectedGymName: selectedGymName,
+                        onGymTap: {
+                            showingGymPicker = true
+                        }
+                    )
+                    .padding(.top, 8)
+                    .background(Color(.systemBackground).opacity(0.95))
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                
+                Spacer()
+            }
+        }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Button {
+                    withAnimation(.spring()) {
+                        showFilters.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Workout Feed")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 24, height: 24)
+                            .background(Color.blue)
+                            .clipShape(Circle())
+                            .rotationEffect(Angle(degrees: showFilters ? 180 : 0))
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
             }
+        }
+        .sheet(isPresented: $showingGymPicker) {
+            GymPickerSheet(
+                gyms: gymRepository.gyms,
+                selectedGym: $selectedGymFilter
+            )
         }
         .task {
             await loadWorkouts()
+            await gymRepository.fetchGyms()
         }
         .onChange(of: currentIndex) { _, newIndex in
-            if newIndex < workouts.count {
+            if newIndex < filteredWorkouts.count {
                 Task {
-                    await loadVoteData(for: workouts[newIndex])
+                    await loadVoteData(for: filteredWorkouts[newIndex])
                 }
             }
+        }
+        .onChange(of: selectedFilter) { _, _ in
+            // Reset to first workout when filter changes
+            currentIndex = 0
         }
     }
     
