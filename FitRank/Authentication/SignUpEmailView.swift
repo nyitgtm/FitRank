@@ -23,6 +23,7 @@ final class SignUpEmailViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var isSignUpComplete = false
+    @Published var hasAgreedToEULA = false
     
     let userRepository = UserRepository()
     let authManager = AuthenticationManager.shared
@@ -326,6 +327,20 @@ struct CredentialsStepView: View {
                     .padding(.horizontal)
             }
             
+            // EULA Agreement
+            Toggle(isOn: $viewModel.hasAgreedToEULA) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("I agree to the Terms of Service and EULA")
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                    Link("View EULA", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+            }
+            .toggleStyle(CheckboxToggleStyle())
+            .padding(.vertical, 8)
+            
             Button(action: {
                 Task {
                     await viewModel.createAuthUser()
@@ -334,8 +349,7 @@ struct CredentialsStepView: View {
                 HStack {
                     if viewModel.isLoading {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(0.8)
+                        // ... existing code ...
                     } else {
                         Text("Continue")
                             .fontWeight(.semibold)
@@ -343,11 +357,25 @@ struct CredentialsStepView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(Color.blue)
+                .background(viewModel.hasAgreedToEULA ? Color.blue : Color.gray)
                 .foregroundColor(.white)
                 .cornerRadius(12)
             }
-            .disabled(viewModel.isLoading)
+            .disabled(viewModel.isLoading || !viewModel.hasAgreedToEULA)
+        }
+    }
+}
+
+struct CheckboxToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
+                .foregroundColor(configuration.isOn ? .blue : .gray)
+                .font(.system(size: 20))
+                .onTapGesture {
+                    configuration.isOn.toggle()
+                }
+            configuration.label
         }
     }
 }
