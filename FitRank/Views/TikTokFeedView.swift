@@ -6,31 +6,35 @@ import FirebaseAuth
 struct CustomVideoPlayer: UIViewRepresentable {
     let player: AVPlayer
     
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView(frame: .zero)
+    func makeUIView(context: Context) -> PlayerView {
+        let view = PlayerView()
         view.backgroundColor = .black
-        
-        let playerLayer = AVPlayerLayer(player: player)
-        playerLayer.videoGravity = .resizeAspectFill
-        playerLayer.frame = view.bounds
-        view.layer.addSublayer(playerLayer)
-        
-        context.coordinator.playerLayer = playerLayer
+        view.playerLayer.player = player
+        view.playerLayer.videoGravity = .resizeAspectFill
         return view
     }
     
-    func updateUIView(_ uiView: UIView, context: Context) {
-        DispatchQueue.main.async {
-            context.coordinator.playerLayer?.frame = uiView.bounds
+    func updateUIView(_ uiView: PlayerView, context: Context) {
+        // Update player if needed
+        if uiView.playerLayer.player !== player {
+            uiView.playerLayer.player = player
         }
     }
     
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-    
-    class Coordinator {
-        var playerLayer: AVPlayerLayer?
+    // Custom UIView subclass that properly manages AVPlayerLayer
+    class PlayerView: UIView {
+        override class var layerClass: AnyClass {
+            return AVPlayerLayer.self
+        }
+        
+        var playerLayer: AVPlayerLayer {
+            return layer as! AVPlayerLayer
+        }
+        
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            // Frame is automatically managed by the layer
+        }
     }
 }
 
@@ -232,6 +236,7 @@ struct WorkoutFeedCard: View {
     @State private var isLoadingGym = true
     @State private var commentCount = 0
     @State private var hasIncrementedView = false
+    @State private var statusObservation: NSKeyValueObservation?
     @StateObject private var userRepository = UserRepository()
     @StateObject private var gymRepository = GymRepository()
     @StateObject private var commentService = CommentService.shared
@@ -465,25 +470,44 @@ struct WorkoutFeedCard: View {
         
         print("🎥 Setting up player for URL: \(url)")
         
+        // Create player item first to observe its status
+        let playerItem = AVPlayerItem(url: url)
+        
         // Create new player
-        let newPlayer = AVPlayer(url: url)
+        let newPlayer = AVPlayer(playerItem: playerItem)
         newPlayer.actionAtItemEnd = .none
         
-        // Set player immediately
+        // Set player immediately so the view can render
         self.player = newPlayer
         
-        // Wait for player to be ready and start playing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.playerReady = true
-            newPlayer.play()
-            self.isPlaying = true
-            print("▶️ Player started playing, rate: \(newPlayer.rate)")
+        // Observe player item status to know when it's ready
+        let statusObserver = playerItem.observe(\.status, options: [.new]) { item, _ in
+            DispatchQueue.main.async {
+                switch item.status {
+                case .readyToPlay:
+                    print("✅ Player ready to play")
+                    self.playerReady = true
+                    newPlayer.play()
+                    self.isPlaying = true
+                    print("▶️ Player started playing, rate: \(newPlayer.rate)")
+                case .failed:
+                    print("❌ Player failed: \(item.error?.localizedDescription ?? "unknown error")")
+                    self.playerReady = false
+                case .unknown:
+                    print("⏳ Player status unknown")
+                @unknown default:
+                    break
+                }
+            }
         }
+        
+        // Store observer to prevent deallocation
+        self.statusObservation = statusObserver
         
         // Loop video
         NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
-            object: newPlayer.currentItem,
+            object: playerItem,
             queue: .main
         ) { _ in
             print("🔄 Video ended, looping...")
@@ -499,6 +523,10 @@ struct WorkoutFeedCard: View {
         
         // Remove notification observers
         NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: player?.currentItem)
+        
+        // Cancel status observation
+        statusObservation?.invalidate()
+        statusObservation = nil
         
         // Stop and clear player
         player?.pause()
