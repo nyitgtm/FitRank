@@ -17,6 +17,7 @@ struct ProfileView: View {
     @State private var showingFriendsList = false
     @State private var showingUserWorkouts = false
     @State private var showingItemShop = false
+    @State private var showingBlockedUsers = false
     
     var body: some View {
         ZStack {
@@ -61,6 +62,15 @@ struct ProfileView: View {
                                 
                                 NavigationLink(destination: AppearanceView()) {
                                     AppearanceNavigationCard(currentTheme: themeManager.selectedTheme)
+                                }
+                                
+                                // Blocked Users Button
+                                ModernActionButton(
+                                    icon: "hand.raised.slash.fill",
+                                    title: "Blocked Users",
+                                    color: .red
+                                ) {
+                                    showingBlockedUsers = true
                                 }
                             }
                             
@@ -108,6 +118,9 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showingItemShop) {
                 ItemShopView()
+            }
+            .sheet(isPresented: $showingBlockedUsers) {
+                BlockedUsersView()
             }
             .preferredColorScheme(themeManager.selectedTheme.colorScheme)
             .accentColor(themeManager.selectedTheme.accentColor)
@@ -521,6 +534,102 @@ struct AppearanceNavigationCard: View {
         case .ocean: return "drop.fill"
         case .sunset: return "sun.horizon.fill"
         case .forest: return "leaf.fill"
+        }
+    }
+}
+
+// MARK: - Blocked Users View
+
+struct BlockedUsersView: View {
+    @Environment(\.dismiss) var dismiss
+    @StateObject private var userRepository = UserRepository()
+    @State private var blockedUsers: [User] = []
+    @State private var isLoading = true
+    
+    var body: some View {
+        NavigationView {
+            Group {
+                if isLoading {
+                    ProgressView("Loading blocked users...")
+                } else if blockedUsers.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "person.2.slash")
+                            .font(.system(size: 50))
+                            .foregroundColor(.secondary)
+                        Text("No blocked users")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    List {
+                        ForEach(blockedUsers) { user in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(user.name)
+                                        .font(.headline)
+                                    Text("@\(user.username)")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Button("Unblock") {
+                                    Task {
+                                        await unblockUser(user)
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(.blue)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Blocked Users")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                await loadBlockedUsers()
+            }
+        }
+    }
+    
+    private func loadBlockedUsers() async {
+        isLoading = true
+        guard let currentUserId = Auth.auth().currentUser?.uid,
+              let currentUser = try? await userRepository.getUser(uid: currentUserId),
+              let blockedIds = currentUser.blockedUsers,
+              !blockedIds.isEmpty else {
+            blockedUsers = []
+            isLoading = false
+            return
+        }
+        
+        do {
+            blockedUsers = try await userRepository.getUsers(ids: blockedIds)
+        } catch {
+            print("Error loading blocked users: \(error)")
+        }
+        isLoading = false
+    }
+    
+    private func unblockUser(_ user: User) async {
+        guard let currentUserId = Auth.auth().currentUser?.uid,
+              let blockedUserId = user.id else { return }
+        
+        do {
+            try await userRepository.unblockUser(currentUserId: currentUserId, blockedUserId: blockedUserId)
+            // Remove from local list
+            blockedUsers.removeAll { $0.id == blockedUserId }
+        } catch {
+            print("Error unblocking user: \(error)")
         }
     }
 }

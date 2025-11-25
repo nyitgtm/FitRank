@@ -25,6 +25,7 @@ struct Report: Identifiable, Codable {
 enum ReportType: String, CaseIterable, Identifiable, Codable {
     case lift = "lift"
     case comment = "comment"
+    case post = "post"
     
     var id: String { rawValue }
     
@@ -32,6 +33,7 @@ enum ReportType: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .lift: return "Lift"
         case .comment: return "Comment"
+        case .post: return "Post"
         }
     }
 }

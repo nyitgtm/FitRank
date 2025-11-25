@@ -94,6 +94,7 @@ final class UserRepository: ObservableObject {
             
             let isCoach = (data["isCoach"] as? Bool) ?? ((data["isCoach"] as? Int) == 1)
             let tokens = (data["tokens"] as? Int) ?? 0
+            let blockedUsers = data["blockedUsers"] as? [String]
             
             var user = User(
                 id: nil, // Will be set by @DocumentID
@@ -101,7 +102,8 @@ final class UserRepository: ObservableObject {
                 team: team,
                 isCoach: isCoach,
                 username: username,
-                tokens: tokens
+                tokens: tokens,
+                blockedUsers: blockedUsers
             )
             
             // Manually set the id (simulating @DocumentID)
@@ -126,5 +128,38 @@ final class UserRepository: ObservableObject {
     // Get team reference by team ID
     func getTeamReference(teamId: String) -> DocumentReference {
         return db.collection("teams").document(teamId)
+    }
+    
+    // Block a user
+    func blockUser(currentUserId: String, blockedUserId: String) async throws {
+        try await db.collection("users").document(currentUserId).updateData([
+            "blockedUsers": FieldValue.arrayUnion([blockedUserId])
+        ])
+    }
+    
+    // Unblock a user
+    func unblockUser(currentUserId: String, blockedUserId: String) async throws {
+        try await db.collection("users").document(currentUserId).updateData([
+            "blockedUsers": FieldValue.arrayRemove([blockedUserId])
+        ])
+    }
+    
+    // Get multiple users by IDs
+    func getUsers(ids: [String]) async throws -> [User] {
+        guard !ids.isEmpty else { return [] }
+        
+        // Firestore 'in' query supports up to 10 items. For more, we need to batch or fetch individually.
+        // For simplicity, we'll fetch individually for now as the blocked list is likely small.
+        // A better approach for production would be chunking 'in' queries.
+        
+        var users: [User] = []
+        
+        for id in ids {
+            if let user = try? await getUser(uid: id) {
+                users.append(user)
+            }
+        }
+        
+        return users
     }
 }

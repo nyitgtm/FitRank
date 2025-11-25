@@ -62,7 +62,10 @@ struct CommunityView: View {
     // SWAP: we now use the Firebase-backed VM
     @StateObject private var vm = CommunityVM_Firebase()
     @StateObject private var friendsVM = FriendsListViewModel() // Add FriendsListViewModel
+    @StateObject private var userRepository = UserRepository()
     @State private var commentingPost: CommunityPost?
+    @State private var reportingPost: CommunityPost?
+    @State private var showReportSheet = false
     
     // Filters
     @State private var selectedFilter: CommunityFilterType = .all
@@ -73,6 +76,7 @@ struct CommunityView: View {
     @State private var lastScrollOffset: CGFloat = 0
     
     @State private var searchText: String = ""
+    @State private var blockedUserIds: Set<String> = []
 
     // Filtered posts based on team + search logic
     private var filteredPosts: [CommunityPost] {
@@ -94,6 +98,9 @@ struct CommunityView: View {
                 items = items.filter { $0.teamTag?.localizedCaseInsensitiveContains(selectedTeam.rawValue) == true }
             }
         }
+        
+        // Filter out blocked users using the cached blockedUserIds
+        items = items.filter { !blockedUserIds.contains($0.authorId) }
 
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return items }
@@ -170,7 +177,16 @@ struct CommunityView: View {
                                         post: post,
                                         likeAction: { vm.toggleLike(post) },
                                         commentAction: { commentingPost = post },
-                                        deleteAction: { vm.deletePost(post) }
+                                        deleteAction: { vm.deletePost(post) },
+                                        reportAction: {
+                                            reportingPost = post
+                                            showReportSheet = true
+                                        },
+                                        blockAction: {
+                                            Task {
+                                                await blockUser(userId: post.authorId)
+                                            }
+                                        }
                                     )
                                     .padding(.horizontal, 16)
                                 }
@@ -282,6 +298,10 @@ struct CommunityView: View {
         .onAppear {
             // Load friends when view appears so we have the list for filtering
             friendsVM.loadFriends()
+            // Load blocked users
+            Task {
+                await loadBlockedUsers()
+            }
         }
         .onChange(of: selectedFilter) { _, newFilter in
             // Auto-collapse filters when a non-teams filter is selected
@@ -290,6 +310,34 @@ struct CommunityView: View {
                     showFilters = false
                 }
             }
+        }
+        .sheet(isPresented: $showReportSheet) {
+            if let post = reportingPost, let postId = post.backendId {
+                ReportSheet(isPresented: $showReportSheet, workoutId: postId)
+            }
+        }
+    }
+    
+    private func loadBlockedUsers() async {
+        guard let currentUserId = Auth.auth().currentUser?.uid,
+              let currentUser = try? await userRepository.getUser(uid: currentUserId),
+              let blockedUsers = currentUser.blockedUsers else {
+            blockedUserIds = []
+            return
+        }
+        blockedUserIds = Set(blockedUsers)
+    }
+    
+    private func blockUser(userId: String) async {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+        
+        do {
+            try await userRepository.blockUser(currentUserId: currentUserId, blockedUserId: userId)
+            print("✅ User blocked")
+            // Update local blocked users list
+            blockedUserIds.insert(userId)
+        } catch {
+            print("❌ Error blocking user: \(error)")
         }
     }
 }
@@ -423,6 +471,8 @@ struct PostCardView: View {
     var likeAction: () -> Void
     var commentAction: () -> Void
     var deleteAction: (() -> Void)? = nil
+    var reportAction: (() -> Void)? = nil
+    var blockAction: (() -> Void)? = nil
     
     @State private var showDeleteAlert = false
     @State private var extractedImageURLs: [URL] = []
@@ -547,10 +597,17 @@ struct PostCardView: View {
                             Label("Delete Post", systemImage: "trash")
                         }
                     } else {
-                        Button {
+                        Button(role: .destructive) {
+                            reportAction?()
                         } label: {
-                            Label("Only author can delete", systemImage: "lock.fill")
-                        }.disabled(true)
+                            Label("Report Post", systemImage: "exclamationmark.bubble")
+                        }
+                        
+                        Button(role: .destructive) {
+                            blockAction?()
+                        } label: {
+                            Label("Block User", systemImage: "hand.raised.slash")
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis")

@@ -200,7 +200,15 @@ struct TikTokFeedView: View {
         do {
             // Fetch ALL workouts for now (including pending)
             // TODO: Filter by published only once moderation is set up
-            workouts = try await firebaseService.getAllWorkouts(limit: 50)
+            let allWorkouts = try await firebaseService.getAllWorkouts(limit: 50)
+            
+            // Filter out blocked users
+            if let currentUser = try? await UserRepository().getUser(uid: Auth.auth().currentUser?.uid ?? ""),
+               let blockedUsers = currentUser.blockedUsers {
+                workouts = allWorkouts.filter { !blockedUsers.contains($0.userId) }
+            } else {
+                workouts = allWorkouts
+            }
             
             print("✅ Loaded \(workouts.count) workouts")
             
@@ -237,9 +245,13 @@ struct WorkoutFeedCard: View {
     @State private var commentCount = 0
     @State private var hasIncrementedView = false
     @State private var statusObservation: NSKeyValueObservation?
+    @State private var showReportSheet = false
+    @State private var reportReason = ""
+    
     @StateObject private var userRepository = UserRepository()
     @StateObject private var gymRepository = GymRepository()
     @StateObject private var commentService = CommentService.shared
+    @StateObject private var reportService = ReportService.shared
     
     private var voteCounts: (upvotes: Int, downvotes: Int) {
         voteService.voteCounts[workout.id ?? ""] ?? (0, 0)
@@ -415,7 +427,33 @@ struct WorkoutFeedCard: View {
                         Spacer()
                         
                         // Right side - Actions
-                        actionButtons
+                        VStack(spacing: 20) {
+                            // Report/Block Menu
+                            Menu {
+                                Button(role: .destructive) {
+                                    showReportSheet = true
+                                } label: {
+                                    Label("Report Workout", systemImage: "exclamationmark.bubble")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    Task {
+                                        await blockUser()
+                                    }
+                                } label: {
+                                    Label("Block User", systemImage: "hand.raised.slash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                                    .background(Color.black.opacity(0.3))
+                                    .clipShape(Circle())
+                            }
+                            
+                            actionButtons
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 32)
@@ -441,6 +479,9 @@ struct WorkoutFeedCard: View {
                         }
                     }
             }
+        }
+        .sheet(isPresented: $showReportSheet) {
+            ReportSheet(isPresented: $showReportSheet, workoutId: workout.id ?? "")
         }
         .onAppear {
             print("🎬 Card appeared for workout: \(workout.id ?? "unknown")")
@@ -660,6 +701,18 @@ struct WorkoutFeedCard: View {
         } else {
             let millions = Double(count) / 1_000_000.0
             return String(format: "%.1fM", millions)
+        }
+    }
+    
+    private func blockUser() async {
+        guard let currentUserId = Auth.auth().currentUser?.uid,
+              let blockedUserId = workout.userId as String? else { return }
+        
+        do {
+            try await userRepository.blockUser(currentUserId: currentUserId, blockedUserId: blockedUserId)
+            print("✅ User blocked")
+        } catch {
+            print("❌ Error blocking user: \(error)")
         }
     }
 }
