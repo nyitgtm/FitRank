@@ -495,7 +495,7 @@ struct WorkoutFeedCard: View {
             }
         }
         .sheet(isPresented: $showReportSheet) {
-            ReportSheet(isPresented: $showReportSheet, workoutId: workout.id ?? "")
+            ReportSheet(isPresented: $showReportSheet, reportType: .lift, targetId: workout.id ?? "")
         }
         .onAppear {
             print("🎬 Card appeared for workout: \(workout.id ?? "unknown")")

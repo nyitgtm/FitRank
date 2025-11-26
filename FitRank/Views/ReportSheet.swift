@@ -2,7 +2,8 @@ import SwiftUI
 
 struct ReportSheet: View {
     @Binding var isPresented: Bool
-    let workoutId: String
+    let reportType: ReportType
+    let targetId: String
     
     @State private var selectedReason: String = ""
     @State private var customReason: String = ""
@@ -78,8 +79,8 @@ struct ReportSheet: View {
         Task {
             do {
                 try await ReportService.shared.submitReport(
-                    type: .lift,
-                    targetID: workoutId,
+                    type: reportType,
+                    targetID: targetId,
                     reason: reason
                 )
                 await MainActor.run {
