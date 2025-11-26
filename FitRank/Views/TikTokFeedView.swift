@@ -46,6 +46,10 @@ struct TikTokFeedView: View {
     @State private var currentIndex = 0
     @State private var isLoading = true
     
+    // Community Guidelines Disclaimer
+    @AppStorage("hasSeenCommunityGuidelines") private var hasSeenGuidelines = false
+    @State private var showGuidelines = false
+    
     // Filters
     @State private var selectedFilter: WorkoutFilterType = .all
     @State private var showFilters = false
@@ -171,11 +175,21 @@ struct TikTokFeedView: View {
                 selectedGym: $selectedGymFilter
             )
         }
+        .sheet(isPresented: $showGuidelines) {
+            CommunityGuidelinesView {
+                hasSeenGuidelines = true
+                showGuidelines = false
+            }
+        }
         .task {
             await loadWorkouts()
             await gymRepository.fetchGyms()
         }
         .onAppear {
+            // Show guidelines on first visit
+            if !hasSeenGuidelines {
+                showGuidelines = true
+            }
             friendsVM.loadFriends()
         }
         .onChange(of: currentIndex) { _, newIndex in

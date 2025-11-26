@@ -67,6 +67,10 @@ struct CommunityView: View {
     @State private var reportingPost: CommunityPost?
     @State private var showReportSheet = false
     
+    // Community Guidelines Disclaimer
+    @AppStorage("hasSeenCommunityGuidelines") private var hasSeenGuidelines = false
+    @State private var showGuidelines = false
+    
     // Filters
     @State private var selectedFilter: CommunityFilterType = .all
     @State private var selectedTeam: TeamFilter = .all
@@ -295,7 +299,17 @@ struct CommunityView: View {
         }
         
         // Notifications Sheet (Removed from here, moved to HomeView)
+        .sheet(isPresented: $showGuidelines) {
+            CommunityGuidelinesView {
+                hasSeenGuidelines = true
+                showGuidelines = false
+            }
+        }
         .onAppear {
+            // Show guidelines on first visit
+            if !hasSeenGuidelines {
+                showGuidelines = true
+            }
             // Load friends when view appears so we have the list for filtering
             friendsVM.loadFriends()
             // Load blocked users
@@ -920,5 +934,131 @@ struct CommentsSheet: View {
         }, message: {
             Text(errorMessage)
         })
+    }
+}
+
+// MARK: - Community Guidelines View
+struct CommunityGuidelinesView: View {
+    let onAccept: () -> Void
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // Icon
+                    HStack {
+                        Spacer()
+                        Image(systemName: "hand.raised.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.blue)
+                        Spacer()
+                    }
+                    .padding(.top, 20)
+                    
+                    // Title
+                    Text("Community Guidelines")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                    
+                    Text("Please read and accept our community rules before posting")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                    
+                    // Guidelines content
+                    VStack(alignment: .leading, spacing: 16) {
+                        GuidelineSection(
+                            title: "Be Respectful",
+                            content: "Treat all community members with respect. No harassment, bullying, hate speech, or discriminatory content will be tolerated. We're all here to support each other's fitness journey."
+                        )
+                        
+                        GuidelineSection(
+                            title: "No Inappropriate Content",
+                            content: "Do not post explicit, offensive, or inappropriate content. This includes nudity, violence, illegal activities, or anything that violates our community standards."
+                        )
+                        
+                        GuidelineSection(
+                            title: "Stay On Topic",
+                            content: "Keep posts relevant to fitness, workouts, nutrition, and team activities. Spam, advertisements, and off-topic content may be removed."
+                        )
+                        
+                        GuidelineSection(
+                            title: "Report Violations",
+                            content: "If you see content that violates these guidelines, please use the report feature. Help us maintain a positive and safe community for everyone."
+                        )
+                        
+                        GuidelineSection(
+                            title: "Account Responsibility",
+                            content: "You are responsible for all activity on your account. Violations of these guidelines may result in content removal, temporary suspension, or permanent ban from the community."
+                        )
+                        
+                        GuidelineSection(
+                            title: "Terms of Service & EULA",
+                            content: "By using FitRank's community features, you agree to abide by these guidelines and Apple's Standard EULA. Continued violations may result in account termination."
+                        )
+                    }
+                    
+                    // EULA Link
+                    Link(destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!) {
+                        HStack {
+                            Image(systemName: "doc.text.fill")
+                            Text("View Apple's Standard EULA")
+                                .font(.subheadline)
+                        }
+                        .foregroundColor(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                    }
+                    
+                    // Accept button
+                    Button(action: onAccept) {
+                        Text("I Agree to the Community Guidelines")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                    }
+                    .padding(.top, 20)
+                    
+                    Spacer(minLength: 40)
+                }
+                .padding()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .interactiveDismissDisabled()
+    }
+}
+
+struct GuidelineSection: View {
+    let title: String
+    let content: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "checkmark.shield.fill")
+                    .foregroundColor(.blue)
+                Text(title)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+            }
+            
+            Text(content)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
     }
 }
