@@ -26,8 +26,8 @@ struct CommunityComment: Identifiable, Hashable {
 
 
 struct CommunityPost: Identifiable, Hashable {
-    let id: UUID = UUID()
-    var backendId: String?          // Firestore doc id
+    let id: String                  // Stable ID (Firestore doc id)
+    var backendId: String?          // (Redundant now, but keeping for compatibility if needed, or we can just use id)
     var authorId: String            // who wrote it
     var authorName: String
     var teamTag: String?
@@ -39,6 +39,7 @@ struct CommunityPost: Identifiable, Hashable {
     var isLikedByMe: Bool
     var createdAt: Date
     var comments: [CommunityComment] = []
+    var extractedImageURLs: [URL] = [] // Pre-computed URLs
 }
 
 struct CommunityNotification: Identifiable, Hashable {
@@ -489,8 +490,9 @@ final class CommunityVM_Firebase: ObservableObject {
                     let liked = await self.svc.isLikedByMe(postId: it.id)
                     mapped.append(
                         CommunityPost(
+                            id: it.id,
                             backendId: it.id,
-                            authorId: it.authorId, // Fixed: was empty string
+                            authorId: it.authorId,
                             authorName: it.authorName,
                             teamTag: it.teamTag,
                             text: it.text,
@@ -500,7 +502,8 @@ final class CommunityVM_Firebase: ObservableObject {
                             commentCount: it.commentCount,
                             isLikedByMe: liked,
                             createdAt: it.createdAt,
-                            comments: []
+                            comments: [],
+                            extractedImageURLs: self.extractImageURLs(from: it.text)
                         )
                     )
                 }
@@ -601,6 +604,27 @@ final class CommunityVM_Firebase: ObservableObject {
         Task {
             await svc.markAllNotificationsAsRead()
         }
+    }
+    
+    // Helper to extract URLs (moved from View)
+    private func extractImageURLs(from text: String) -> [URL] {
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        let matches = detector?.matches(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count))
+        
+        let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "bmp"]
+        
+        var urls: [URL] = []
+        for match in matches ?? [] {
+            if let range = Range(match.range, in: text),
+               let url = URL(string: String(text[range])) {
+                // Check if URL points to an image
+                let pathExtension = url.pathExtension.lowercased()
+                if imageExtensions.contains(pathExtension) || url.absoluteString.contains("media-amazon") || url.absoluteString.contains("imgur") {
+                    urls.append(url)
+                }
+            }
+        }
+        return urls
     }
 }
 

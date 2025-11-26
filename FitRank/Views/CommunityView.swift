@@ -489,7 +489,7 @@ struct PostCardView: View {
     var blockAction: (() -> Void)? = nil
     
     @State private var showDeleteAlert = false
-    @State private var extractedImageURLs: [URL] = []
+    // extractedImageURLs is now in post.extractedImageURLs
 
     // Limit images so they don't exceed the visible screen width
     private let maxImageWidth: CGFloat = min(UIScreen.main.bounds.width - 40, 400)
@@ -502,31 +502,13 @@ struct PostCardView: View {
         return .orange
     }
     
-    // Extract image URLs from text
-    private func extractImageURLs(from text: String) -> [URL] {
-        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
-        let matches = detector?.matches(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count))
-        
-        let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "bmp"]
-        
-        var urls: [URL] = []
-        for match in matches ?? [] {
-            if let range = Range(match.range, in: text),
-               let url = URL(string: String(text[range])) {
-                // Check if URL points to an image
-                let pathExtension = url.pathExtension.lowercased()
-                if imageExtensions.contains(pathExtension) || url.absoluteString.contains("media-amazon") || url.absoluteString.contains("imgur") {
-                    urls.append(url)
-                }
-            }
-        }
-        return urls
-    }
+    // extractImageURLs moved to ViewModel/Model
     
+    // Remove image URLs from display text
     // Remove image URLs from display text
     private func textWithoutImageURLs(_ text: String) -> String {
         var cleanedText = text
-        for url in extractedImageURLs {
+        for url in post.extractedImageURLs {
             cleanedText = cleanedText.replacingOccurrences(of: url.absoluteString, with: "")
         }
         return cleanedText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -638,8 +620,8 @@ struct PostCardView: View {
             }
             
             // Images extracted from text URLs
-            if !extractedImageURLs.isEmpty {
-                ForEach(extractedImageURLs, id: \.self) { imageURL in
+            if !post.extractedImageURLs.isEmpty {
+                ForEach(post.extractedImageURLs, id: \.self) { imageURL in
                     AsyncImage(url: imageURL) { phase in
                         switch phase {
                         case .empty:
@@ -733,7 +715,7 @@ struct PostCardView: View {
             Text("Are you sure you want to delete this post? This action cannot be undone.")
         })
         .onAppear {
-            extractedImageURLs = extractImageURLs(from: post.text)
+            // No longer needed to extract URLs here
         }
     }
 }
