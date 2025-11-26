@@ -8,7 +8,7 @@ class ReportService: ObservableObject {
     
     private init() {}
     
-    func submitReport(type: ReportType, targetID: String, reason: String) async throws {
+    func submitReport(type: ReportType, targetID: String, parentID: String? = nil, reason: String) async throws {
         guard let currentUserID = Auth.auth().currentUser?.uid else {
             throw NSError(domain: "ReportService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])
         }
@@ -16,6 +16,7 @@ class ReportService: ObservableObject {
         let report = Report(
             type: type,
             targetID: targetID,
+            parentID: parentID,
             reason: reason,
             reporterID: currentUserID
         )

@@ -4,6 +4,7 @@ struct ReportSheet: View {
     @Binding var isPresented: Bool
     let reportType: ReportType
     let targetId: String
+    let parentId: String?
     
     @State private var selectedReason: String = ""
     @State private var customReason: String = ""
@@ -81,6 +82,7 @@ struct ReportSheet: View {
                 try await ReportService.shared.submitReport(
                     type: reportType,
                     targetID: targetId,
+                    parentID: parentId,
                     reason: reason
                 )
                 await MainActor.run {

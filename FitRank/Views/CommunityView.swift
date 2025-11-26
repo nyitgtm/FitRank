@@ -917,7 +917,9 @@ struct CommentsSheet: View {
             Text(errorMessage)
         })
         .sheet(item: $reportingComment) { comment in
-            CommentReportSheetWrapper(commentId: comment.backendId, reportingComment: $reportingComment)
+            if let postId = post.backendId {
+                CommentReportSheetWrapper(commentId: comment.backendId, postId: postId, reportingComment: $reportingComment)
+            }
         }
     }
 }

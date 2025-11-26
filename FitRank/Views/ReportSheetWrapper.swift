@@ -14,7 +14,8 @@ struct ReportSheetWrapper: View {
                 set: { if !$0 { reportingPost = nil } }
             ),
             reportType: reportType,
-            targetId: targetId
+            targetId: targetId,
+            parentId: nil
         )
     }
 }
@@ -22,6 +23,7 @@ struct ReportSheetWrapper: View {
 // Wrapper for comment reporting
 struct CommentReportSheetWrapper: View {
     let commentId: String
+    let postId: String
     @Binding var reportingComment: CommunityComment?
     @Environment(\.dismiss) private var dismiss
     
@@ -31,8 +33,9 @@ struct CommentReportSheetWrapper: View {
                 get: { reportingComment != nil },
                 set: { if !$0 { reportingComment = nil } }
             ),
-            reportType: .comment,
-            targetId: commentId
+            reportType: .postComment,
+            targetId: commentId,
+            parentId: postId
         )
     }
 }

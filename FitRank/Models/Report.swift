@@ -3,17 +3,19 @@ import FirebaseFirestore
 
 struct Report: Identifiable, Codable {
     @DocumentID var id: String?
-    var type: ReportType // "lift" or "comment"
-    var targetID: String // ID of lift or comment being reported
+    var type: ReportType // "lift", "comment", or "post"
+    var targetID: String // ID of lift, comment, or post being reported
+    var parentID: String? // For comments: the parent post ID
     var reason: String
     var reporterID: String
     var status: ReportStatus // "pending", "reviewed", "dismissed"
     var timestamp: Date
     
-    init(id: String? = nil, type: ReportType, targetID: String, reason: String, reporterID: String) {
+    init(id: String? = nil, type: ReportType, targetID: String, parentID: String? = nil, reason: String, reporterID: String) {
         self.id = id
         self.type = type
         self.targetID = targetID
+        self.parentID = parentID
         self.reason = reason
         self.reporterID = reporterID
         self.status = .pending
@@ -26,6 +28,7 @@ enum ReportType: String, CaseIterable, Identifiable, Codable {
     case lift = "lift"
     case comment = "comment"
     case post = "post"
+    case postComment = "post-comment"
     
     var id: String { rawValue }
     
@@ -34,6 +37,7 @@ enum ReportType: String, CaseIterable, Identifiable, Codable {
         case .lift: return "Lift"
         case .comment: return "Comment"
         case .post: return "Post"
+        case .postComment: return "Post Comment"
         }
     }
 }
