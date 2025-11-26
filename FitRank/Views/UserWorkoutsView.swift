@@ -10,6 +10,7 @@ struct UserWorkoutsView: View {
     @State private var showingDeleteAlert = false
     @State private var workoutToDelete: Workout?
     @State private var selectedWorkout: Workout?
+    @State private var commentingWorkout: Workout?
     @StateObject private var gymRepository = GymRepository()
     
     // Filters
@@ -145,6 +146,7 @@ struct UserWorkoutsView: View {
                                 WorkoutFilterBar(
                                     selectedFilter: $selectedFilter,
                                     isCollapsed: $isCollapsed,
+                                    availableFilters: [.all, .squat, .bench, .deadlift, .gym],
                                     selectedGymName: selectedGymName,
                                     onGymTap: {
                                         showingGymPicker = true
@@ -182,6 +184,9 @@ struct UserWorkoutsView: View {
                                     onDelete: {
                                         workoutToDelete = workout
                                         showingDeleteAlert = true
+                                    },
+                                    onComment: {
+                                        commentingWorkout = workout
                                     }
                                 )
                                 .padding(.horizontal, 20)
@@ -242,6 +247,13 @@ struct UserWorkoutsView: View {
         }
         .sheet(item: $selectedWorkout) { workout in
             WorkoutDetailView(workout: workout)
+        }
+        .sheet(item: $commentingWorkout) { workout in
+            if let workoutID = workout.id {
+                CommentsSheetView(workoutID: workoutID)
+                    .presentationDragIndicator(.visible)
+                    .presentationDetents([.medium, .large])
+            }
         }
         .alert("Delete Workout?", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) {
@@ -501,6 +513,7 @@ struct WorkoutCardWithDelete: View {
     let workout: Workout
     let onTap: () -> Void
     let onDelete: () -> Void
+    var onComment: (() -> Void)? = nil
     @ObservedObject private var voteService = VoteService.shared
     @State private var upvotes: Int = 0
     @State private var downvotes: Int = 0
@@ -545,6 +558,13 @@ struct WorkoutCardWithDelete: View {
                     WorkoutStatItem(icon: "eye.fill", value: "\(workout.views)", color: .secondary)
                     WorkoutStatItem(icon: userVote == .upvote ? "hand.thumbsup.fill" : "hand.thumbsup", value: "\(upvotes)", color: .green)
                     WorkoutStatItem(icon: userVote == .downvote ? "hand.thumbsdown.fill" : "hand.thumbsdown", value: "\(downvotes)", color: .red)
+                    
+                    // Comment button
+                    Button {
+                        onComment?()
+                    } label: {
+                        WorkoutStatItem(icon: "text.bubble", value: "Comment", color: .blue)
+                    }
                 }
                 
                 // Date and status
@@ -673,13 +693,14 @@ enum WorkoutFilterType: String, CaseIterable, Identifiable {
 struct WorkoutFilterBar: View {
     @Binding var selectedFilter: WorkoutFilterType
     @Binding var isCollapsed: Bool
+    var availableFilters: [WorkoutFilterType] = WorkoutFilterType.allCases
     var selectedGymName: String = "Gym"
     var onGymTap: (() -> Void)?
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
-                ForEach(WorkoutFilterType.allCases) { filter in
+                ForEach(availableFilters) { filter in
                     Button {
                         if filter == .gym {
                             selectedFilter = filter
