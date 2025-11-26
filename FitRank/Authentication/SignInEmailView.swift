@@ -16,7 +16,9 @@ final class SignInEmailViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var showResetPassword = false
     @Published var resetEmail = ""
+
     @Published var resetSuccessMessage: String?
+    @Published var showHelp = false
     
     func signIn() {
         guard !email.isEmpty, !password.isEmpty else {
@@ -31,7 +33,15 @@ final class SignInEmailViewModel: ObservableObject {
             do {
                 let returnedUserData = try await AuthenticationManager.shared.signIn(email: email, password: password)
                 print(returnedUserData)
-                isSignedIn = true
+                
+                // Check if user is deleted
+                if let user = try await UserRepository().getUser(uid: returnedUserData.uid),
+                   user.deleteUser == true {
+                    try AuthenticationManager.shared.signOut()
+                    errorMessage = "Account suspended. Contact fitrank.control@gmail.com"
+                } else {
+                    isSignedIn = true
+                }
             } catch {
                 print("Sign-in error: \(error)")
                 errorMessage = "Sign-in failed. Please check your credentials."
@@ -173,7 +183,21 @@ struct SignInEmailView: View {
                 }
             }
             .padding()
+            .padding()
             .navigationBarHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        viewModel.showHelp = true
+                    }) {
+                        Image(systemName: "questionmark.circle")
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $viewModel.showHelp) {
+            HelpView()
         }
         .sheet(isPresented: $showSignUp) {
             NavigationStack {

@@ -17,7 +17,10 @@ struct ProfileView: View {
     @State private var showingFriendsList = false
     @State private var showingUserWorkouts = false
     @State private var showingItemShop = false
+
     @State private var showingBlockedUsers = false
+    @State private var showingDeleteConfirmation = false
+    @State private var deleteErrorMessage: String?
     
     var body: some View {
         ZStack {
@@ -84,6 +87,16 @@ struct ProfileView: View {
                                     userViewModel.signOut()
                                     showSignInView = true
                                 }
+                                
+                                // Delete Account Button
+                                Button(action: {
+                                    showingDeleteConfirmation = true
+                                }) {
+                                    Text("Delete Account")
+                                        .font(.caption)
+                                        .foregroundColor(.red.opacity(0.8))
+                                        .padding(.top, 8)
+                                }
                             }
                         }
                         .padding(.horizontal, 20)
@@ -121,6 +134,26 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showingBlockedUsers) {
                 BlockedUsersView()
+            }
+            .alert("Delete Account?", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    Task {
+                        await deleteAccount()
+                    }
+                }
+            } message: {
+                Text("Your account will be suspended in a couple of hours and all content deleted in a business week.")
+            }
+            .alert("Error", isPresented: Binding<Bool>(
+                get: { deleteErrorMessage != nil },
+                set: { if !$0 { deleteErrorMessage = nil } }
+            )) {
+                Button("OK") { }
+            } message: {
+                if let errorMessage = deleteErrorMessage {
+                    Text(errorMessage)
+                }
             }
             .preferredColorScheme(themeManager.selectedTheme.colorScheme)
             .accentColor(themeManager.selectedTheme.accentColor)
@@ -219,6 +252,19 @@ struct ProfileView: View {
             
         } catch {
             print("❌ Failed to load equipped badge: \(error)")
+        }
+    }
+    
+    private func deleteAccount() async {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        
+        do {
+            try await UserRepository().markUserForDeletion(uid: uid)
+            userViewModel.signOut()
+            showSignInView = true
+        } catch {
+            print("Error deleting account: \(error)")
+            deleteErrorMessage = "Failed to delete account. Please try again."
         }
     }
 }

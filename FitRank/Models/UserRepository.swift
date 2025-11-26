@@ -36,7 +36,8 @@ final class UserRepository: ObservableObject {
             "team": user.team,        // team ID as String
             "isCoach": user.isCoach,
             "username": user.username,
-            "tokens": user.tokens
+            "tokens": user.tokens,
+            "deleteUser": user.deleteUser ?? false
         ])
     }
 
@@ -95,6 +96,7 @@ final class UserRepository: ObservableObject {
             let isCoach = (data["isCoach"] as? Bool) ?? ((data["isCoach"] as? Int) == 1)
             let tokens = (data["tokens"] as? Int) ?? 0
             let blockedUsers = data["blockedUsers"] as? [String]
+            let deleteUser = data["deleteUser"] as? Bool
             
             var user = User(
                 id: nil, // Will be set by @DocumentID
@@ -103,7 +105,8 @@ final class UserRepository: ObservableObject {
                 isCoach: isCoach,
                 username: username,
                 tokens: tokens,
-                blockedUsers: blockedUsers
+                blockedUsers: blockedUsers,
+                deleteUser: deleteUser
             )
             
             // Manually set the id (simulating @DocumentID)
@@ -161,5 +164,12 @@ final class UserRepository: ObservableObject {
         }
         
         return users
+    }
+    
+    // Mark user for deletion
+    func markUserForDeletion(uid: String) async throws {
+        try await db.collection("users").document(uid).updateData([
+            "deleteUser": true
+        ])
     }
 }

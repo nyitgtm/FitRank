@@ -11,6 +11,8 @@ struct User: Identifiable, Codable, Equatable {
     var isDarkMode: Bool? // Dark mode preference
     var blockedUsers: [String]? // List of blocked user IDs
     
+    var deleteUser: Bool? // Flag for account deletion
+    
     enum CodingKeys: String, CodingKey {
         case id
         case name
@@ -20,10 +22,11 @@ struct User: Identifiable, Codable, Equatable {
         case tokens
         case isDarkMode
         case blockedUsers
+        case deleteUser
     }
     
     // Manual initializer
-    init(id: String?, name: String, team: String, isCoach: Bool, username: String, tokens: Int, isDarkMode: Bool? = nil, blockedUsers: [String]? = nil) {
+    init(id: String?, name: String, team: String, isCoach: Bool, username: String, tokens: Int, isDarkMode: Bool? = nil, blockedUsers: [String]? = nil, deleteUser: Bool? = nil) {
         self.id = id
         self.name = name
         self.team = team
@@ -32,6 +35,7 @@ struct User: Identifiable, Codable, Equatable {
         self.tokens = tokens
         self.isDarkMode = isDarkMode
         self.blockedUsers = blockedUsers
+        self.deleteUser = deleteUser
     }
 }
 
