@@ -803,7 +803,7 @@ struct CommentsSheet: View {
     @State private var input: String = ""
     @State private var comments: [CommunityComment] = []
     @State private var reportingComment: CommunityComment?
-    @State private var showReportSheet = false
+
 
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
@@ -860,7 +860,6 @@ struct CommentsSheet: View {
                                     } else {
                                         Button(role: .destructive) {
                                             reportingComment = c
-                                            showReportSheet = true
                                         } label: {
                                             Label("Report Comment", systemImage: "exclamationmark.bubble")
                                         }
@@ -917,10 +916,8 @@ struct CommentsSheet: View {
         }, message: {
             Text(errorMessage)
         })
-        .sheet(isPresented: $showReportSheet) {
-            if let comment = reportingComment {
-                ReportSheet(isPresented: $showReportSheet, reportType: .comment, targetId: comment.backendId)
-            }
+        .sheet(item: $reportingComment) { comment in
+            CommentReportSheetWrapper(commentId: comment.backendId, reportingComment: $reportingComment)
         }
     }
 }

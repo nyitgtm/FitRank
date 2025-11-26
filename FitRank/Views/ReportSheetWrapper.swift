@@ -18,3 +18,21 @@ struct ReportSheetWrapper: View {
         )
     }
 }
+
+// Wrapper for comment reporting
+struct CommentReportSheetWrapper: View {
+    let commentId: String
+    @Binding var reportingComment: CommunityComment?
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        ReportSheet(
+            isPresented: Binding(
+                get: { reportingComment != nil },
+                set: { if !$0 { reportingComment = nil } }
+            ),
+            reportType: .comment,
+            targetId: commentId
+        )
+    }
+}
