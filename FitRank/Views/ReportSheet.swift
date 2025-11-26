@@ -18,9 +18,9 @@ struct ReportSheet: View {
     ]
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
-                Section(header: Text("Why are you reporting this post?")) {
+                Section(header: Text("Why are you reporting this?")) {
                     ForEach(reasons, id: \.self) { reason in
                         Button {
                             selectedReason = reason

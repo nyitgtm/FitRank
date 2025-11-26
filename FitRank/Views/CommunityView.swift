@@ -65,7 +65,6 @@ struct CommunityView: View {
     @StateObject private var userRepository = UserRepository()
     @State private var commentingPost: CommunityPost?
     @State private var reportingPost: CommunityPost?
-    @State private var showReportSheet = false
     
     // Community Guidelines Disclaimer
     @AppStorage("hasSeenCommunityGuidelines") private var hasSeenGuidelines = false
@@ -184,7 +183,6 @@ struct CommunityView: View {
                                         deleteAction: { vm.deletePost(post) },
                                         reportAction: {
                                             reportingPost = post
-                                            showReportSheet = true
                                         },
                                         blockAction: {
                                             Task {
@@ -325,9 +323,9 @@ struct CommunityView: View {
                 }
             }
         }
-        .sheet(isPresented: $showReportSheet) {
-            if let post = reportingPost, let postId = post.backendId {
-                ReportSheet(isPresented: $showReportSheet, reportType: .post, targetId: postId)
+        .sheet(item: $reportingPost) { post in
+            if let postId = post.backendId {
+                ReportSheetWrapper(reportType: .post, targetId: postId, reportingPost: $reportingPost)
             }
         }
     }
