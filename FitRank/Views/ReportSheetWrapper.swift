@@ -15,12 +15,14 @@ struct ReportSheetWrapper: View {
             ),
             reportType: reportType,
             targetId: targetId,
-            parentId: nil
+            parentId: nil,
+            workoutId: nil,
+            parentCommentId: nil
         )
     }
 }
 
-// Wrapper for comment reporting
+// Wrapper for post comment reporting
 struct CommentReportSheetWrapper: View {
     let commentId: String
     let postId: String
@@ -35,7 +37,54 @@ struct CommentReportSheetWrapper: View {
             ),
             reportType: .postComment,
             targetId: commentId,
-            parentId: postId
+            parentId: postId,
+            workoutId: nil,
+            parentCommentId: nil
+        )
+    }
+}
+
+// Wrapper for workout comment reporting
+struct WorkoutCommentReportSheetWrapper: View {
+    let commentId: String
+    let workoutId: String
+    @Binding var reportingComment: Comment?
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        ReportSheet(
+            isPresented: Binding(
+                get: { reportingComment != nil },
+                set: { if !$0 { reportingComment = nil } }
+            ),
+            reportType: .workoutComment,
+            targetId: commentId,
+            parentId: nil,
+            workoutId: workoutId,
+            parentCommentId: nil
+        )
+    }
+}
+
+// Wrapper for workout comment reply reporting
+struct WorkoutCommentReplyReportSheetWrapper: View {
+    let replyId: String
+    let workoutId: String
+    let parentCommentId: String
+    @Binding var reportingReply: Comment?
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        ReportSheet(
+            isPresented: Binding(
+                get: { reportingReply != nil },
+                set: { if !$0 { reportingReply = nil } }
+            ),
+            reportType: .workoutCommentReply,
+            targetId: replyId,
+            parentId: nil,
+            workoutId: workoutId,
+            parentCommentId: parentCommentId
         )
     }
 }

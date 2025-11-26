@@ -5,6 +5,8 @@ struct ReportSheet: View {
     let reportType: ReportType
     let targetId: String
     let parentId: String?
+    let workoutId: String?
+    let parentCommentId: String?
     
     @State private var selectedReason: String = ""
     @State private var customReason: String = ""
@@ -83,6 +85,8 @@ struct ReportSheet: View {
                     type: reportType,
                     targetID: targetId,
                     parentID: parentId,
+                    workoutID: workoutId,
+                    parentCommentID: parentCommentId,
                     reason: reason
                 )
                 await MainActor.run {

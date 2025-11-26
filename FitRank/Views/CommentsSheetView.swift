@@ -175,6 +175,7 @@ struct CommentRowView: View {
     @State private var showReplies = false
     @State private var replyUsers: [String: User] = [:]
     @StateObject private var userRepository = UserRepository()
+    @State private var reportingComment: Comment?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -240,6 +241,17 @@ struct CommentRowView: View {
                                 .foregroundColor(.secondary)
                         }
                         
+                        // Report button
+                        if Auth.auth().currentUser?.uid != comment.userID {
+                            Button {
+                                reportingComment = comment
+                            } label: {
+                                Text("Report")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
                         // Show replies if any
                         if comment.replyCount > 0 {
                             Button {
@@ -280,6 +292,11 @@ struct CommentRowView: View {
         }
         .task {
             await loadLikeStatus()
+        }
+        .sheet(item: $reportingComment) { comment in
+            if let commentId = comment.id {
+                WorkoutCommentReportSheetWrapper(commentId: commentId, workoutId: workoutID, reportingComment: $reportingComment)
+            }
         }
     }
     
@@ -338,6 +355,7 @@ struct ReplyRowView: View {
     let user: User?
     
     @StateObject private var commentService = CommentService.shared
+    @State private var reportingReply: Comment?
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -364,25 +382,38 @@ struct ReplyRowView: View {
                 Text(reply.content)
                     .font(.subheadline)
                 
-                Button {
-                    Task {
-                        guard let userID = Auth.auth().currentUser?.uid else { return }
-                        try? await commentService.toggleLike(
-                            workoutID: workoutID,
-                            commentID: reply.id ?? "",
-                            userID: userID,
-                            isReply: true,
-                            parentCommentID: reply.parentCommentID
-                        )
-                        await loadLikeStatus()
+                HStack(spacing: 12) {
+                    Button {
+                        Task {
+                            guard let userID = Auth.auth().currentUser?.uid else { return }
+                            try? await commentService.toggleLike(
+                                workoutID: workoutID,
+                                commentID: reply.id ?? "",
+                                userID: userID,
+                                isReply: true,
+                                parentCommentID: reply.parentCommentID
+                            )
+                            await loadLikeStatus()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: commentService.commentLikes["\(workoutID):\(reply.id ?? "")"] == true ? "heart.fill" : "heart")
+                                .foregroundColor(commentService.commentLikes["\(workoutID):\(reply.id ?? "")"] == true ? .red : .secondary)
+                                .font(.caption)
+                            if reply.likes > 0 {
+                                Text("\(reply.likes)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: commentService.commentLikes["\(workoutID):\(reply.id ?? "")"] == true ? "heart.fill" : "heart")
-                            .foregroundColor(commentService.commentLikes["\(workoutID):\(reply.id ?? "")"] == true ? .red : .secondary)
-                            .font(.caption)
-                        if reply.likes > 0 {
-                            Text("\(reply.likes)")
+                    
+                    // Report button
+                    if Auth.auth().currentUser?.uid != reply.userID {
+                        Button {
+                            reportingReply = reply
+                        } label: {
+                            Text("Report")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
@@ -395,6 +426,11 @@ struct ReplyRowView: View {
         }
         .task {
             await loadLikeStatus()
+        }
+        .sheet(item: $reportingReply) { reply in
+            if let replyId = reply.id, let parentCommentId = reply.parentCommentID {
+                WorkoutCommentReplyReportSheetWrapper(replyId: replyId, workoutId: workoutID, parentCommentId: parentCommentId, reportingReply: $reportingReply)
+            }
         }
     }
     
