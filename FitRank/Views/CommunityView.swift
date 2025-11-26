@@ -703,10 +703,6 @@ struct PostCardView: View {
                 Button(action: commentAction) {
                     Label("\(post.commentCount)", systemImage: "text.bubble")
                 }
-                Spacer()
-                Button { /* share later */ } label: {
-                    Image(systemName: "square.and.arrow.up")
-                }
             }
             .font(.subheadline)
             .foregroundColor(.primary.opacity(0.8))
