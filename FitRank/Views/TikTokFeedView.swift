@@ -115,7 +115,8 @@ struct TikTokFeedView: View {
                         ForEach(Array(filteredWorkouts.enumerated()), id: \.element.id) { index, workout in
                             WorkoutFeedCard(
                                 workout: workout,
-                                voteService: voteService
+                                voteService: voteService,
+                                isCurrentCard: index == currentIndex
                             )
                             .tag(index)
                             .id(workout.id) // Force recreate on workout change
@@ -248,6 +249,7 @@ struct TikTokFeedView: View {
 struct WorkoutFeedCard: View {
     let workout: Workout
     @ObservedObject var voteService: VoteService
+    let isCurrentCard: Bool
     @State private var showComments: Bool = false
     
     @State private var player: AVPlayer?
@@ -421,6 +423,7 @@ struct WorkoutFeedCard: View {
                             Text("\(workout.weight) lbs • \(workout.liftTypeEnum.displayName)")
                                 .font(.subheadline)
                                 .foregroundColor(.white.opacity(0.9))
+                                .allowsHitTesting(false)
                             
                             if workout.gymId != nil {
                                 HStack(spacing: 4) {
@@ -438,9 +441,9 @@ struct WorkoutFeedCard: View {
                                     }
                                 }
                                 .foregroundColor(.white.opacity(0.8))
+                                .allowsHitTesting(false)
                             }
                         }
-                        .allowsHitTesting(false)
                         
                         Spacer()
                         
@@ -517,6 +520,23 @@ struct WorkoutFeedCard: View {
             print("👋 Card disappeared for workout: \(workout.id ?? "unknown")")
             cleanupPlayer()
         }
+        .onChange(of: isCurrentCard) { _, isCurrent in
+            print("🔄 Card visibility changed for workout: \(workout.id ?? "unknown"), isCurrent: \(isCurrent), playerReady: \(playerReady)")
+            if isCurrent {
+                // This card is now visible, play the video if ready
+                if playerReady, let player = player {
+                    player.play()
+                    isPlaying = true
+                    print("▶️ Resumed playback")
+                }
+                // If player not ready, isPlaying stays false and will be set when ready
+            } else {
+                // This card is no longer visible, pause the video
+                player?.pause()
+                isPlaying = false
+                print("⏸️ Paused playback")
+            }
+        }
     }
     
     private func setupPlayer() {
@@ -547,11 +567,17 @@ struct WorkoutFeedCard: View {
             DispatchQueue.main.async {
                 switch item.status {
                 case .readyToPlay:
-                    print("✅ Player ready to play")
+                    print("✅ Player ready to play for workout: \(self.workout.id ?? "unknown"), isCurrentCard: \(self.isCurrentCard)")
                     self.playerReady = true
-                    newPlayer.play()
-                    self.isPlaying = true
-                    print("▶️ Player started playing, rate: \(newPlayer.rate)")
+                    // Only auto-play if this is the current card
+                    if self.isCurrentCard {
+                        newPlayer.play()
+                        self.isPlaying = true
+                        print("▶️ Player started playing, rate: \(newPlayer.rate)")
+                    } else {
+                        print("⏸️ Player ready but not current card, staying paused")
+                        self.isPlaying = false
+                    }
                 case .failed:
                     print("❌ Player failed: \(item.error?.localizedDescription ?? "unknown error")")
                     self.playerReady = false
