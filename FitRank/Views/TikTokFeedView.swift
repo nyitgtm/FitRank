@@ -417,6 +417,7 @@ struct WorkoutFeedCard: View {
                             }
                             .foregroundColor(.white)
                             .onTapGesture {
+                                print("👤 Tapped user profile for userId: \(workout.userId)")
                                 selectedUserId = workout.userId
                             }
                             
