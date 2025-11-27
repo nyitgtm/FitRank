@@ -7,6 +7,8 @@ struct PublicProfileView: View {
     @StateObject private var workoutViewModel = WorkoutViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var showBlockAlert = false
+    @State private var selectedWorkout: Workout?
+    @State private var commentingWorkout: Workout?
     
     var body: some View {
         NavigationView {
@@ -157,7 +159,15 @@ struct PublicProfileView: View {
                             } else {
                                 LazyVStack(spacing: 12) {
                                     ForEach(workoutViewModel.userWorkouts.prefix(5)) { workout in
-                                        WorkoutRow(workout: workout)
+                                        PublicWorkoutCard(
+                                            workout: workout,
+                                            onTap: {
+                                                selectedWorkout = workout
+                                            },
+                                            onComment: {
+                                                commentingWorkout = workout
+                                            }
+                                        )
                                     }
                                 }
                                 .padding(.horizontal)
@@ -193,6 +203,16 @@ struct PublicProfileView: View {
                 }
             } message: {
                 Text("They will no longer be able to see your content or interact with you.")
+            }
+            .sheet(item: $selectedWorkout) { workout in
+                WorkoutDetailView(workout: workout)
+            }
+            .sheet(item: $commentingWorkout) { workout in
+                if let workoutID = workout.id {
+                    CommentsSheetView(workoutID: workoutID)
+                        .presentationDragIndicator(.visible)
+                        .presentationDetents([.medium, .large])
+                }
             }
         }
     }
@@ -278,40 +298,100 @@ struct BestLiftCard: View {
     }
 }
 
-// Reusing WorkoutRow logic or creating a simple one
-struct WorkoutRow: View {
+// Simplified workout card for public profile (no delete button)
+struct PublicWorkoutCard: View {
     let workout: Workout
+    let onTap: () -> Void
+    let onComment: () -> Void
+    @ObservedObject private var voteService = VoteService.shared
+    @State private var upvotes: Int = 0
+    @State private var downvotes: Int = 0
     
     var body: some View {
-        HStack {
-            Image(systemName: workout.liftTypeEnum.icon)
-                .font(.title2)
-                .foregroundColor(.white)
-                .frame(width: 40, height: 40)
-                .background(Color.blue)
-                .clipShape(Circle())
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(workout.liftTypeEnum.displayName)
-                    .font(.headline)
-                
-                Text("\(workout.weight) lbs")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            if let videoUrl = URL(string: workout.videoUrl) {
-                Link(destination: videoUrl) {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Header with lift type
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(workout.liftTypeEnum.displayName)
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        Text("\(workout.weight) lbs")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    Spacer()
+                    
+                    // Play icon
                     Image(systemName: "play.circle.fill")
-                        .font(.title2)
+                        .font(.largeTitle)
+                        .foregroundColor(.blue)
+                }
+                
+                Divider()
+                
+                // Stats
+                HStack(spacing: 20) {
+                    WorkoutStatItem(icon: "eye.fill", value: "\(workout.views)", color: .secondary)
+                    WorkoutStatItem(icon: "hand.thumbsup", value: "\(upvotes)", color: .green)
+                    WorkoutStatItem(icon: "hand.thumbsdown", value: "\(downvotes)", color: .red)
+                    
+                    // Comment button
+                    Button {
+                        onComment()
+                    } label: {
+                        WorkoutStatItem(icon: "text.bubble", value: "Comment", color: .blue)
+                    }
+                }
+                
+                // Date
+                HStack {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.caption2)
+                        Text(workout.createdAt, style: .relative)
+                            .font(.caption2)
+                    }
+                    .foregroundColor(.secondary)
+                    
+                    Spacer()
+                }
+                
+                // Tap to view hint
+                HStack {
+                    Spacer()
+                    Text("Tap to view")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
                         .foregroundColor(.blue)
                 }
             }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
         }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
+        .buttonStyle(.plain)
+        .task {
+            if let id = workout.id {
+                await voteService.fetchVoteCounts(workoutId: id)
+                if let counts = voteService.voteCounts[id] {
+                    upvotes = counts.upvotes
+                    downvotes = counts.downvotes
+                }
+            }
+        }
+        .onReceive(voteService.$voteCounts) { _ in
+            if let id = workout.id, let counts = voteService.voteCounts[id] {
+                upvotes = counts.upvotes
+                downvotes = counts.downvotes
+            }
+        }
     }
 }
