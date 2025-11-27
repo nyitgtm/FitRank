@@ -11,6 +11,7 @@ struct CommentsSheetView: View {
     @State private var replyingTo: Comment?
     @State private var commentUsers: [String: User] = [:] // Cache user data
     @FocusState private var isInputFocused: Bool
+    @State private var selectedUserId: String?
     
     var body: some View {
         NavigationView {
@@ -24,7 +25,8 @@ struct CommentsSheetView: View {
                                     workoutID: workoutID,
                                     comment: comment,
                                     user: commentUsers[comment.userID],
-                                    onReply: { replyingTo = $0 }
+                                    onReply: { replyingTo = $0 },
+                                    onProfileTap: { selectedUserId = comment.userID }
                                 )
                             }
                         } else {
@@ -101,6 +103,9 @@ struct CommentsSheetView: View {
         .task {
             await loadComments()
         }
+        .sheet(item: $selectedUserId) { userId in
+            PublicProfileView(userId: userId)
+        }
     }
     
     private func loadComments() async {
@@ -170,12 +175,14 @@ struct CommentRowView: View {
     let comment: Comment
     let user: User?
     let onReply: (Comment) -> Void
+    let onProfileTap: () -> Void
     
     @StateObject private var commentService = CommentService.shared
     @State private var showReplies = false
     @State private var replyUsers: [String: User] = [:]
     @StateObject private var userRepository = UserRepository()
     @State private var reportingComment: Comment?
+    @State private var selectedUserId: String?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -189,6 +196,9 @@ struct CommentRowView: View {
                             .foregroundColor(.white)
                             .font(.caption)
                     }
+                    .onTapGesture {
+                        onProfileTap()
+                    }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     // Username and time
@@ -196,6 +206,9 @@ struct CommentRowView: View {
                         Text(user?.username ?? "user")
                             .font(.subheadline)
                             .fontWeight(.semibold)
+                            .onTapGesture {
+                                onProfileTap()
+                            }
                         
                         Text(timeAgoString(from: comment.timestamp))
                             .font(.caption)
@@ -282,7 +295,8 @@ struct CommentRowView: View {
                             ReplyRowView(
                                 workoutID: workoutID,
                                 reply: reply,
-                                user: replyUsers[reply.userID]
+                                user: replyUsers[reply.userID],
+                                onProfileTap: { selectedUserId = reply.userID }
                             )
                         }
                     }
@@ -297,6 +311,9 @@ struct CommentRowView: View {
             if let commentId = comment.id {
                 WorkoutCommentReportSheetWrapper(commentId: commentId, workoutId: workoutID, reportingComment: $reportingComment)
             }
+        }
+        .sheet(item: $selectedUserId) { userId in
+            PublicProfileView(userId: userId)
         }
     }
     
@@ -353,6 +370,7 @@ struct ReplyRowView: View {
     let workoutID: String
     let reply: Comment
     let user: User?
+    let onProfileTap: () -> Void
     
     @StateObject private var commentService = CommentService.shared
     @State private var reportingReply: Comment?
@@ -367,12 +385,18 @@ struct ReplyRowView: View {
                         .foregroundColor(.white)
                         .font(.caption2)
                 }
+                .onTapGesture {
+                    onProfileTap()
+                }
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(user?.username ?? "user")
                         .font(.caption)
                         .fontWeight(.semibold)
+                        .onTapGesture {
+                            onProfileTap()
+                        }
                     
                     Text(timeAgoString(from: reply.timestamp))
                         .font(.caption2)

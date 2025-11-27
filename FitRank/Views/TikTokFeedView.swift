@@ -261,6 +261,7 @@ struct WorkoutFeedCard: View {
     @State private var statusObservation: NSKeyValueObservation?
     @State private var showReportSheet = false
     @State private var reportReason = ""
+    @State private var selectedUserId: String?
     
     @StateObject private var userRepository = UserRepository()
     @StateObject private var gymRepository = GymRepository()
@@ -413,6 +414,9 @@ struct WorkoutFeedCard: View {
                                 }
                             }
                             .foregroundColor(.white)
+                            .onTapGesture {
+                                selectedUserId = workout.userId
+                            }
                             
                             Text("\(workout.weight) lbs • \(workout.liftTypeEnum.displayName)")
                                 .font(.subheadline)
@@ -496,6 +500,9 @@ struct WorkoutFeedCard: View {
         }
         .sheet(isPresented: $showReportSheet) {
             ReportSheet(isPresented: $showReportSheet, reportType: .lift, targetId: workout.id ?? "", parentId: nil, workoutId: nil, parentCommentId: nil)
+        }
+        .sheet(item: $selectedUserId) { userId in
+            PublicProfileView(userId: userId)
         }
         .onAppear {
             print("🎬 Card appeared for workout: \(workout.id ?? "unknown")")

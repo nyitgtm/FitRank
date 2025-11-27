@@ -80,6 +80,7 @@ struct CommunityView: View {
     
     @State private var searchText: String = ""
     @State private var blockedUserIds: Set<String> = []
+    @State private var selectedUserId: String?
 
     // Filtered posts based on team + search logic
     private var filteredPosts: [CommunityPost] {
@@ -188,6 +189,9 @@ struct CommunityView: View {
                                             Task {
                                                 await blockUser(userId: post.authorId)
                                             }
+                                        },
+                                        onProfileTap: {
+                                            selectedUserId = post.authorId
                                         }
                                     )
                                     .padding(.horizontal, 16)
@@ -327,6 +331,9 @@ struct CommunityView: View {
             if let postId = post.backendId {
                 ReportSheetWrapper(reportType: .post, targetId: postId, reportingPost: $reportingPost)
             }
+        }
+        .sheet(item: $selectedUserId) { userId in
+            PublicProfileView(userId: userId)
         }
     }
     
@@ -485,6 +492,7 @@ struct PostCardView: View {
     var deleteAction: (() -> Void)? = nil
     var reportAction: (() -> Void)? = nil
     var blockAction: (() -> Void)? = nil
+    var onProfileTap: (() -> Void)? = nil
     
     @State private var showDeleteAlert = false
     // extractedImageURLs is now in post.extractedImageURLs
@@ -564,8 +572,14 @@ struct PostCardView: View {
                     .fill(Color.gray.opacity(0.2))
                     .frame(width: 36, height: 36)
                     .overlay(Image(systemName: "person.fill"))
+                    .onTapGesture {
+                        onProfileTap?()
+                    }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(post.authorName).font(.subheadline).fontWeight(.semibold)
+                        .onTapGesture {
+                            onProfileTap?()
+                        }
                     HStack(spacing: 6) {
                         if let tag = post.teamTag {
                             Text(tag)
@@ -1048,4 +1062,9 @@ struct GuidelineSection: View {
         .background(Color(.systemGray6))
         .cornerRadius(12)
     }
+}
+
+// MARK: - Extensions
+extension String: Identifiable {
+    public var id: String { self }
 }
