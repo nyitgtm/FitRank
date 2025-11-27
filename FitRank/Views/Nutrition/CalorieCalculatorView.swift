@@ -29,6 +29,9 @@ struct CalorieCalculatorView: View {
                     // Calculate Button
                     calculateButton
                     
+                    // References
+                    referencesSection
+                    
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 20)
@@ -272,6 +275,48 @@ struct CalorieCalculatorView: View {
             .shadow(color: .blue.opacity(0.3), radius: 5, x: 0, y: 3)
         }
         .disabled(!viewModel.isFormValid || viewModel.isLoading)
+    }
+    
+    private var referencesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("References")
+                .font(.headline)
+                .foregroundColor(.primary)
+                .padding(.bottom, 4)
+            
+            Group {
+                Text("Mifflin MD, St Jeor ST, Hill LA, Scott BJ, Daugherty SA, Koh YO.")
+                    .fontWeight(.semibold)
+                + Text(" \"A new predictive equation for resting energy expenditure in healthy individuals.\" ")
+                    .italic()
+                + Text("Am J Clin Nutr. 1990;51(2):241-7. doi: 10.1093/ajcn/51.2.241.")
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+            
+            Group {
+                Text("Frankenfield D, Roth-Yousey L, Compher C.")
+                    .fontWeight(.semibold)
+                + Text(" \"Comparison of predictive equations for resting metabolic rate in healthy nonobese and obese adults: a systematic review.\" ")
+                    .italic()
+                + Text("J Am Diet Assoc. 2005;105(5):775-89. doi: 10.1016/j.jada.2005.02.005.")
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+            
+            Text("The Mifflin-St Jeor Equation calculator is created by QxMD.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Link("More Information (Medscape)", destination: URL(string: "https://reference.medscape.com/calculator/846/mifflin-st-jeor-equation")!)
+                .font(.caption)
+                .foregroundColor(.blue)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 }
 

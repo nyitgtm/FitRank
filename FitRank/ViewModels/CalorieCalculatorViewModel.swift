@@ -69,16 +69,18 @@ final class CalorieCalculatorViewModel: ObservableObject {
     
     private func performCalculation(weightKg: Double, heightCm: Double) {
         // Calculate BMR using Mifflin-St Jeor Equation
+        // Females: (10*weight [kg]) + (6.25*height [cm]) – (5*age [years]) – 161
+        // Males: (10*weight [kg]) + (6.25*height [cm]) – (5*age [years]) + 5
         let bmr: Double
         switch userProfile.gender {
         case .male:
-            bmr = 10 * weightKg + 6.25 * heightCm - 5 * Double(userProfile.age) + 5
+            bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * Double(userProfile.age)) + 5
         case .female:
-            bmr = 10 * weightKg + 6.25 * heightCm - 5 * Double(userProfile.age) - 161
+            bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * Double(userProfile.age)) - 161
         case .other:
             // Use average of male and female formula
-            let maleBMR = 10 * weightKg + 6.25 * heightCm - 5 * Double(userProfile.age) + 5
-            let femaleBMR = 10 * weightKg + 6.25 * heightCm - 5 * Double(userProfile.age) - 161
+            let maleBMR = (10 * weightKg) + (6.25 * heightCm) - (5 * Double(userProfile.age)) + 5
+            let femaleBMR = (10 * weightKg) + (6.25 * heightCm) - (5 * Double(userProfile.age)) - 161
             bmr = (maleBMR + femaleBMR) / 2
         }
         
