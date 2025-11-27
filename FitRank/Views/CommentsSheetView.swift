@@ -246,9 +246,9 @@ struct CommentRowView: View {
                             Button {
                                 reportingComment = comment
                             } label: {
-                                Text("Report")
-                                    .font(.caption)
+                                Image(systemName: "exclamationmark.bubble")
                                     .foregroundColor(.secondary)
+                                    .font(.caption)
                             }
                         }
                         
@@ -409,15 +409,15 @@ struct ReplyRowView: View {
                     }
                     
                     // Report button
-                    if Auth.auth().currentUser?.uid != reply.userID {
+                    // if Auth.auth().currentUser?.uid != reply.userID {
                         Button {
                             reportingReply = reply
                         } label: {
-                            Text("Report")
-                                .font(.caption2)
+                            Image(systemName: "exclamationmark.bubble")
                                 .foregroundColor(.secondary)
+                                .font(.caption)
                         }
-                    }
+                    // }
                 }
                 .padding(.top, 2)
             }
