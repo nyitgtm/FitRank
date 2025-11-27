@@ -817,7 +817,7 @@ struct CommentsSheet: View {
     @State private var input: String = ""
     @State private var comments: [CommunityComment] = []
     @State private var reportingComment: CommunityComment?
-
+    @State private var selectedUserId: String?
 
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
@@ -826,73 +826,107 @@ struct CommentsSheet: View {
         VStack(spacing: 0) {
             Capsule().fill(Color.secondary.opacity(0.4))
                 .frame(width: 40, height: 5)
-                .padding(.top, 8).padding(.bottom, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
 
             Text("Comments")
                 .font(.headline)
-                .padding(.bottom, 8)
+                .padding(.bottom, 12)
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 14) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     ForEach(comments) { c in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(c.authorName).font(.subheadline).fontWeight(.semibold)
-                                Text(c.createdAt, style: .relative)
-                                    .foregroundColor(.secondary).font(.caption)
-                                Spacer()
+                        HStack(alignment: .top, spacing: 12) {
+                            // User Avatar
+                            Circle()
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(width: 36, height: 36)
+                                .overlay(
+                                    Image(systemName: "person.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                )
+                                .onTapGesture {
+                                    selectedUserId = c.authorId
+                                }
+                            
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text(c.authorName)
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .onTapGesture {
+                                            selectedUserId = c.authorId
+                                        }
+                                    
+                                    Text(c.createdAt, style: .relative)
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                    
+                                    Spacer()
 
-                                // Always show the menu; gate "Delete" by ownership
-                                let isOwner = Auth.auth().currentUser?.uid == c.authorId
-                                Menu {
-                                    if isOwner {
-                                        Button(role: .destructive) {
-                                            // Optimistic UI
-                                            if let idx = comments.firstIndex(where: { $0.backendId == c.backendId }) {
-                                                comments.remove(at: idx)
-                                            }
-                                            // Firestore delete
-                                            Task {
-                                                guard let pid = post.backendId else { return }
-                                                do {
-                                                    try await CommunityService.shared.deleteComment(
-                                                        postId: pid,
-                                                        commentId: c.backendId
-                                                    )
-                                                } catch {
-                                                    await MainActor.run {
-                                                        errorMessage = "Couldn't delete. \(error.localizedDescription)"
-                                                        showErrorAlert = true
-                                                        // put the comment back if delete failed
-                                                        comments.insert(c, at: 0)
+                                    // Always show the menu; gate "Delete" by ownership
+                                    let isOwner = Auth.auth().currentUser?.uid == c.authorId
+                                    Menu {
+                                        if isOwner {
+                                            Button(role: .destructive) {
+                                                // Optimistic UI
+                                                if let idx = comments.firstIndex(where: { $0.backendId == c.backendId }) {
+                                                    comments.remove(at: idx)
+                                                }
+                                                // Firestore delete
+                                                Task {
+                                                    guard let pid = post.backendId else { return }
+                                                    do {
+                                                        try await CommunityService.shared.deleteComment(
+                                                            postId: pid,
+                                                            commentId: c.backendId
+                                                        )
+                                                    } catch {
+                                                        await MainActor.run {
+                                                            errorMessage = "Couldn't delete. \(error.localizedDescription)"
+                                                            showErrorAlert = true
+                                                            // put the comment back if delete failed
+                                                            comments.insert(c, at: 0)
+                                                        }
                                                     }
                                                 }
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
                                             }
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
+                                        } else {
+                                            Button(role: .destructive) {
+                                                reportingComment = c
+                                            } label: {
+                                                Label("Report Comment", systemImage: "exclamationmark.bubble")
+                                            }
                                         }
-                                    } else {
-                                        Button(role: .destructive) {
-                                            reportingComment = c
-                                        } label: {
-                                            Label("Report Comment", systemImage: "exclamationmark.bubble")
-                                        }
+                                    } label: {
+                                        Image(systemName: "ellipsis")
+                                            .rotationEffect(.degrees(90))
+                                            .padding(.horizontal, 4)
                                     }
-                                } label: {
-                                    Image(systemName: "ellipsis")
-                                        .rotationEffect(.degrees(90))
-                                        .padding(.horizontal, 4)
                                 }
+                                
+                                Text(c.text)
+                                    .font(.body)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            Text(c.text)
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 4)
                     }
 
                     if comments.isEmpty {
-                        Text("Be the first to comment.")
-                            .foregroundColor(.secondary)
-                            .padding(.vertical, 40)
+                        VStack(spacing: 8) {
+                            Image(systemName: "text.bubble")
+                                .font(.system(size: 40))
+                                .foregroundColor(.secondary)
+                            Text("Be the first to comment.")
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
                     }
                 }
                 .padding(.top, 8)
@@ -900,9 +934,17 @@ struct CommentsSheet: View {
 
             Divider()
 
-            HStack {
+            HStack(spacing: 12) {
                 TextField("Write a comment…", text: $input)
                     .textFieldStyle(.roundedBorder)
+                    .submitLabel(.send)
+                    .onSubmit {
+                        let msg = input.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !msg.isEmpty else { return }
+                        onSend(msg)
+                        input = ""
+                    }
+                
                 Button {
                     let msg = input.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !msg.isEmpty else { return }
@@ -910,10 +952,14 @@ struct CommentsSheet: View {
                     input = ""
                 } label: {
                     Image(systemName: "paperplane.fill")
+                        .font(.body)
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(.systemBackground))
         }
         .onAppear {
             // Live comments feed so we have backendId/authorId
@@ -934,6 +980,9 @@ struct CommentsSheet: View {
             if let postId = post.backendId {
                 CommentReportSheetWrapper(commentId: comment.backendId, postId: postId, reportingComment: $reportingComment)
             }
+        }
+        .sheet(item: $selectedUserId) { userId in
+            PublicProfileView(userId: userId)
         }
     }
 }
