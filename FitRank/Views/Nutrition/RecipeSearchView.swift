@@ -88,6 +88,32 @@ struct RecipeSearchView: View {
             
             Spacer()
         }
+        .overlay(
+            VStack {
+                Spacer()
+                // Spoonacular Citation
+                VStack(spacing: 8) {
+                    Image("spoonacular")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 40)
+                    
+                    Text("Powered by Spoonacular")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Link("View Spoonacular API", destination: URL(string: "https://spoonacular.com/food-api")!)
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .opacity(recipes.isEmpty ? 1 : 0) // Fade out when recipes are shown (user likely scrolling)
+                .animation(.easeInOut, value: recipes.isEmpty)
+            }
+            .ignoresSafeArea(.keyboard)
+        )
         .navigationTitle("Recipe Search")
         .navigationBarTitleDisplayMode(.large)
     }

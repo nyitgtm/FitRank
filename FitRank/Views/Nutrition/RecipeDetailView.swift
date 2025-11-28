@@ -68,6 +68,25 @@ struct RecipeDetailView: View {
                     }
                 }
                 .padding()
+                
+                // Spoonacular Citation
+                VStack(spacing: 8) {
+                    Image("spoonacular")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 40)
+                    
+                    Text("Powered by Spoonacular")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Link("View Spoonacular API", destination: URL(string: "https://spoonacular.com/food-api")!)
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color(.secondarySystemBackground))
             } else {
                 Text("Recipe not found.")
                     .foregroundColor(.secondary)
