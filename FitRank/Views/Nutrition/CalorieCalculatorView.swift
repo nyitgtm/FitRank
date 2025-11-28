@@ -311,6 +311,17 @@ struct CalorieCalculatorView: View {
             Link("More Information (Medscape)", destination: URL(string: "https://reference.medscape.com/calculator/846/mifflin-st-jeor-equation")!)
                 .font(.caption)
                 .foregroundColor(.blue)
+            
+            Divider()
+                .padding(.vertical, 8)
+            
+            Text("U.S. Department of Agriculture, Agricultural Research Service, Beltsville Human Nutrition Research Center. FoodData Central. [Internet]. [cited 28 Nov 2025]. Available from https://fdc.nal.usda.gov/.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Link("Visit FoodData Central", destination: URL(string: "https://fdc.nal.usda.gov/")!)
+                .font(.caption)
+                .foregroundColor(.blue)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)

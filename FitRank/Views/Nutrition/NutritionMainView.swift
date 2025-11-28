@@ -236,6 +236,11 @@ struct NutritionDisclaimerView: View {
                             title: "No Liability",
                             content: "FitRank and its developers are not liable for any injuries, health issues, or damages resulting from use of this app. Use at your own risk."
                         )
+                        
+                        DisclaimerSection(
+                            title: "Data Sources",
+                            content: "U.S. Department of Agriculture, Agricultural Research Service, Beltsville Human Nutrition Research Center. FoodData Central. [Internet]. [cited 28 Nov 2025]. Available from https://fdc.nal.usda.gov/."
+                        )
                     }
                     
                     // Accept button

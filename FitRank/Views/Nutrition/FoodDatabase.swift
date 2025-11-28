@@ -82,6 +82,23 @@ struct FoodDatabaseView: View {
                 }
             }
             .listStyle(PlainListStyle())
+            
+            // USDA Citation
+            VStack(spacing: 4) {
+                Text("U.S. Department of Agriculture, Agricultural Research Service, Beltsville Human Nutrition Research Center. FoodData Central. [Internet]. [cited 28 Nov 2025]. Available from https://fdc.nal.usda.gov/.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                
+                Link("Visit FoodData Central", destination: URL(string: "https://fdc.nal.usda.gov/")!)
+                    .font(.caption2)
+                    .foregroundColor(.blue)
+            }
+            .padding()
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(12)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
         }
         .navigationTitle("Food Database")
         .navigationBarTitleDisplayMode(.large)
@@ -159,6 +176,23 @@ struct FoodDetailView: View {
                 }
             }
             .padding()
+            
+            // USDA Citation
+            VStack(spacing: 4) {
+                Text("U.S. Department of Agriculture, Agricultural Research Service, Beltsville Human Nutrition Research Center. FoodData Central. [Internet]. [cited 28 Nov 2025]. Available from https://fdc.nal.usda.gov/.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                
+                Link("Visit FoodData Central", destination: URL(string: "https://fdc.nal.usda.gov/")!)
+                    .font(.caption2)
+                    .foregroundColor(.blue)
+            }
+            .padding()
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(12)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
         }
         .navigationTitle("Food Details")
         .navigationBarTitleDisplayMode(.inline)
