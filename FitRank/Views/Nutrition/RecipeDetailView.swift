@@ -61,7 +61,7 @@ struct RecipeDetailView: View {
                         .font(.headline)
                     
                     if let instructions = recipe.instructions, !instructions.isEmpty {
-                        Text(instructions)
+                        Text(cleanHTML(instructions))
                     } else {
                         Text("Instructions not available.")
                             .foregroundColor(.secondary)
@@ -133,6 +133,18 @@ struct RecipeDetailView: View {
                 }
             }
         }.resume()
+    }
+    
+    func cleanHTML(_ html: String) -> String {
+        guard let data = html.data(using: .utf8) else { return html }
+        if let attributedString = try? NSAttributedString(
+            data: data,
+            options: [.documentType: NSAttributedString.DocumentType.html, .characterEncoding: String.Encoding.utf8.rawValue],
+            documentAttributes: nil
+        ) {
+            return attributedString.string
+        }
+        return html
     }
 }
 
