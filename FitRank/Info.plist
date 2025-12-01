@@ -2,45 +2,37 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSCameraUsageDescription</key>
-	<string>FitRank needs access to your camera to record workout videos.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>FitRank needs access to your microphone to record audio with your workout videos.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>FitRank needs access to your photo library to select workout videos.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>FitRank needs your location to find the closest gym to you.</string>
 	<key>CFBundleIcons</key>
 	<dict>
-		<key>CFBundlePrimaryIcon</key>
-		<dict>
-			<key>CFBundleIconName</key>
-			<string>AppIcon</string>
-			<key>CFBundleIconFiles</key>
-			<array>
-				<string>AppIcon</string>
-			</array>
-		</dict>
 		<key>CFBundleAlternateIcons</key>
 		<dict>
-			<key>AppIcon-Gold</key>
-			<dict>
-				<key>CFBundleIconName</key>
-				<string>AppIcon-Gold</string>
-				<key>CFBundleIconFiles</key>
-				<array>
-					<string>AppIcon-Gold</string>
-				</array>
-			</dict>
 			<key>AppIcon-Diamond</key>
 			<dict>
-				<key>CFBundleIconName</key>
-				<string>AppIcon-Diamond</string>
 				<key>CFBundleIconFiles</key>
 				<array>
 					<string>AppIcon-Diamond</string>
 				</array>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Diamond</string>
 			</dict>
+			<key>AppIcon-Gold</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>AppIcon-Gold</string>
+				</array>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Gold</string>
+			</dict>
+		</dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconFiles</key>
+			<array>
+				<string>AppIcon</string>
+			</array>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
 		</dict>
 	</dict>
 </dict>

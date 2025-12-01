@@ -465,8 +465,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FitRank/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSLocationUsageDescription = "This app needs your location to show your position on the map";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs your location to show your position on the mapThis app needs your location to show your position on the map";
+				INFOPLIST_KEY_NSCameraUsageDescription = "FitRank needs access to your camera to record workout videos.";
+				INFOPLIST_KEY_NSLocationUsageDescription = "FitRank needs your location to show your position on the heatmap and also find the closest gym to you";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "FitRank needs your location to show your position on the heatmap and also find the closest gym to you";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "FitRank needs access to your microphone to record audio with your workout videos.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "FitRank needs access to your photo library to select workout videos or upload pictures to the community section.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -514,8 +517,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FitRank/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSLocationUsageDescription = "This app needs your location to show your position on the map";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs your location to show your position on the mapThis app needs your location to show your position on the map";
+				INFOPLIST_KEY_NSCameraUsageDescription = "FitRank needs access to your camera to record workout videos.";
+				INFOPLIST_KEY_NSLocationUsageDescription = "FitRank needs your location to show your position on the heatmap and also find the closest gym to you";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "FitRank needs your location to show your position on the heatmap and also find the closest gym to you";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "FitRank needs access to your microphone to record audio with your workout videos.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "FitRank needs access to your photo library to select workout videos or upload pictures to the community section.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
