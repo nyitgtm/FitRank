@@ -3,9 +3,9 @@ import SwiftUI
 enum AppTheme: String, CaseIterable, Identifiable, Codable {
     case light
     case dark
-    case ocean
-    case sunset
-    case forest
+    // case ocean
+    // case sunset
+    // case forest
 
     var id: String { rawValue }
 
@@ -13,15 +13,15 @@ enum AppTheme: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .light:  return "Light"
         case .dark:   return "Dark"
-        case .ocean:  return "Ocean"
-        case .sunset: return "Sunset"
-        case .forest: return "Forest"
+        // case .ocean:  return "Ocean"
+        // case .sunset: return "Sunset"
+        // case .forest: return "Forest"
         }
     }
 
     var isPremium: Bool {
         switch self {
-        case .light, .dark, .ocean: return false
+        case .light, .dark: return false // , .ocean
         default:                    return true
         }
     }
@@ -29,7 +29,7 @@ enum AppTheme: String, CaseIterable, Identifiable, Codable {
 
     var colorScheme: ColorScheme? {
         switch self {
-        case .light, .ocean, .sunset, .forest: return .light
+        case .light: return .light // , .ocean, .sunset, .forest
         case .dark:                             return .dark
         }
     }
@@ -38,16 +38,16 @@ enum AppTheme: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .light:  return .blue
         case .dark:   return .purple
-        case .ocean:  return Color(red: 0.00, green: 0.60, blue: 0.75) // tropical teal-blue
-        case .sunset: return .orange
-        case .forest: return .green
+        // case .ocean:  return Color(red: 0.00, green: 0.60, blue: 0.75) // tropical teal-blue
+        // case .sunset: return .orange
+        // case .forest: return .green
         }
     }
 
     var backgroundColor: Color {
         switch self {
         case .dark:   return .black
-        case .ocean:  return Color(red: 0.04, green: 0.35, blue: 0.50) // deep sea base
+        // case .ocean:  return Color(red: 0.04, green: 0.35, blue: 0.50) // deep sea base
         default:      return Color(.systemGroupedBackground)
         }
     }
@@ -55,23 +55,23 @@ enum AppTheme: String, CaseIterable, Identifiable, Codable {
     var cardBackgroundColor: Color {
         switch self {
         case .dark:   return Color(.secondarySystemBackground)
-        case .ocean:  return Color(red: 0.12, green: 0.55, blue: 0.70).opacity(0.85)
+        // case .ocean:  return Color(red: 0.12, green: 0.55, blue: 0.70).opacity(0.85)
         default:      return Color(.systemBackground)
         }
     }
 
     var gradientBackground: LinearGradient {
         switch self {
-        case .ocean:
-            return LinearGradient(
-                colors: [
-                    Color(red: 0.00, green: 0.45, blue: 0.65),
-                    Color(red: 0.00, green: 0.65, blue: 0.75),
-                    Color(red: 0.00, green: 0.80, blue: 0.85)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+        // case .ocean:
+        //     return LinearGradient(
+        //         colors: [
+        //             Color(red: 0.00, green: 0.45, blue: 0.65),
+        //             Color(red: 0.00, green: 0.65, blue: 0.75),
+        //             Color(red: 0.00, green: 0.80, blue: 0.85)
+        //         ],
+        //         startPoint: .topLeading,
+        //         endPoint: .bottomTrailing
+        //     )
         case .dark:
             return LinearGradient(colors: [.black, .gray.opacity(0.5)],
                                   startPoint: .top, endPoint: .bottom)

@@ -577,9 +577,9 @@ struct AppearanceNavigationCard: View {
         switch theme {
         case .light: return "sun.max.fill"
         case .dark: return "moon.fill"
-        case .ocean: return "drop.fill"
-        case .sunset: return "sun.horizon.fill"
-        case .forest: return "leaf.fill"
+//        case .ocean: return "drop.fill"
+//        case .sunset: return "sun.horizon.fill"
+//        case .forest: return "leaf.fill"
         }
     }
 }
