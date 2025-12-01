@@ -329,16 +329,7 @@ struct WorkoutFeedCard: View {
                     .foregroundColor(.white)
             }
             
-            // Share
-            VStack(spacing: 4) {
-                Button {
-                    // TODO: Share functionality
-                } label: {
-                    Image(systemName: "arrowshape.turn.up.right")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                }
-            }
+
             
             // Views
             VStack(spacing: 4) {
