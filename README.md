@@ -1,205 +1,134 @@
-# FitRank iOS App
+<div align="center">
+  <img src="https://github.com/nyitgtm/FitRank/blob/main/FitRank/Assets.xcassets/fitrank_shield.imageset/fitrank_shield.png?raw=true" alt="FitRank Logo" width="100">
+  <h1>FitRank iOS App</h1>
+  
+  [![Netlify Status](https://api.netlify.com/api/v1/badges/407eaca7-55a7-4e50-869f-7edadfcc2f72/deploy-status)](https://app.netlify.com/projects/fitrank/deploys)
 
-FitRank is a community-driven fitness app that gamifies workout logging and peer validation of lifts. It combines video lift uploads, workout tracking, and team-based leaderboards, backed by Firebase services.
+  <p>
+    <a href="https://apps.apple.com/us/app/fitrank-fitness-tracking/id6754830427">Download on the App Store</a>
+  </p>
+</div>
 
-## Features
+FitRank is a comprehensive fitness application designed to gamify the workout experience through community validation, competitive leaderboards, and integrated nutrition tracking. The application leverages a robust backend architecture using Firebase and Cloudflare R2 to support video-based workout logging, social interaction, and real-time data synchronization.
 
-### 🏋️ Core Functionality
-- **Video Workout Recording**: Record and upload workout videos with camera integration
-- **Lift Validation**: Community rating system (+1/-1) for workout form validation
-- **Team Competition**: Join one of three fixed teams (Killa Gorillas, Dark Sharks, Regal Eagles)
-- **Gamification**: Token system for positive community engagement
-- **GPS Tagging**: Automatic location tagging for gym-based features
+## Project Overview
 
-### 🏆 Leaderboards
-- **Global Leaderboard**: Rank all users by tokens earned
-- **Team Leaderboard**: Compete within your team
-- **Gym Leaderboard**: See top lifts at specific gym locations
+The application is built using SwiftUI and follows the Model-View-ViewModel (MVVM) architectural pattern. It integrates deeply with Firebase services for authentication, database management, and server-side logic, while utilizing Cloudflare R2 for efficient and cost-effective video storage.
 
-### 👥 Community Features
-- **Comments**: Add feedback and discussion to workouts
-- **Reporting**: Flag inappropriate content for moderation
-- **Coach System**: Special privileges for verified coaches
-- **Content Moderation**: Automatic flagging of downvoted content
+### Core Value Propositions
 
-## Architecture
+1.  **Community Validation**: A peer-review system where users upload workout videos that are voted on by the community. Valid lifts earn tokens and improve rankings.
+2.  **Gamification**: Users earn tokens through engagement (uploading, voting, commenting) which can be spent in an Item Shop for cosmetic upgrades.
+3.  **Team Competition**: Users join one of three teams (Killa Gorillas, Dark Sharks, Regal Eagles) to compete on global leaderboards.
+4.  **Holistic Fitness**: Integrated nutrition tools including calorie calculation, meal logging, and progress tracking complement the workout features.
 
-### MVVM Pattern
-The app follows the Model-View-ViewModel architecture for clean separation of concerns:
+## Architecture and Technology Stack
 
-- **Models**: Data structures for User, Workout, Rating, Comment, Gym, Report
-- **ViewModels**: Business logic and state management (UserViewModel, WorkoutViewModel, etc.)
-- **Views**: SwiftUI user interface components
-- **Components**: Reusable UI elements (WorkoutCardView, TeamBadgeView, etc.)
+### Frontend (iOS)
+*   **Language**: Swift 5.8+
+*   **UI Framework**: SwiftUI
+*   **Architecture**: MVVM (Model-View-ViewModel)
+*   **Concurrency**: Swift Concurrency (async/await)
 
-### Firebase Integration
-- **Authentication**: Email/password user management
-- **Firestore**: NoSQL database for all app data
-- **Storage**: Video file storage and management
-- **Cloud Functions**: Automated backend workflows
-- **Security Rules**: Comprehensive data access control
+### Backend (Firebase & Cloudflare)
+*   **Authentication**: Firebase Auth (Email/Password)
+*   **Database**: Cloud Firestore (NoSQL)
+*   **Storage**: 
+    *   **Cloudflare R2**: Primary storage for workout videos (S3-compatible).
+    *   **Firebase Storage**: Secondary storage for static assets like post images.
+*   **Serverless Logic**: Firebase Cloud Functions (Node.js)
 
-## Project Structure
+## Feature Modules
 
-```
-FitRank/
-├── Models/                 # Data models and enums
-├── ViewModels/            # MVVM view models
-├── Views/                 # Main app screens
-├── Components/            # Reusable UI components
-├── Firebase/              # Firebase configuration and rules
-│   ├── firestore.rules    # Security rules
-│   └── functions/         # Cloud Functions
-├── Authentication/        # Auth-related views and managers
-├── Assets.xcassets/       # App icons and images
-└── Info.plist            # App permissions and configuration
-```
+### 1. Authentication & User Management
+*   **Files**: `Authentication/`, `Models/User.swift`, `Repositories/UserRepository.swift`
+*   **Functionality**: Handles user registration, login, and profile management.
+*   **Data Model**: Users are stored in the `users` collection with attributes for team affiliation, token balance, and role (e.g., coach/admin).
 
-## Data Models
+### 2. Workout Feed & Validation
+*   **Files**: `Views/TikTokFeedView.swift`, `Models/Workout.swift`, `Services/VoteService.swift`
+*   **Functionality**: A scrolling feed similar to social media platforms. Users can view workout videos, vote (+1 for good form, -1 for bad form), and comment.
+*   **Video Playback**: Custom `AVPlayer` implementation for seamless looping and playback control.
+*   **Voting Logic**: Votes are transactional and update the workout's score in real-time. Cloud Functions monitor downvote ratios to automatically flag content for moderation.
 
-### User
-- Profile information (name, username, team)
-- Role flags (coach, admin)
-- Token balance for gamification
+### 3. Video Upload System
+*   **Files**: `Services/VideoUploadService.swift`, `Services/SecureVideoUploadService.swift`, `Services/R2Config.swift`
+*   **Functionality**: 
+    *   Videos are compressed locally using `AVAssetExportSession` to optimize for mobile networks.
+    *   Uploads are performed directly to Cloudflare R2 using AWS Signature V4 authentication or presigned URLs, bypassing the application server to reduce load and latency.
+    *   Strict validation ensures videos meet duration (max 30s) and size constraints.
 
-### Workout
-- Video URL and metadata
-- Weight, lift type, and location
-- Community ratings and view counts
-- Moderation status
+### 4. Community & Social
+*   **Files**: `Views/CommunityView.swift`, `Views/CommunityBackendHook.swift`, `Models/Comment.swift`
+*   **Functionality**: A general discussion board separate from the workout feed. Supports text and image posts, threading, and reporting.
+*   **Teams**: Users are segmented into teams. Filters allow viewing content specific to "Killa Gorillas", "Dark Sharks", or "Regal Eagles".
+*   **Moderation**: Comprehensive reporting system (`ReportService.swift`) and blocking capabilities (`UserRepository.swift`) ensure community safety.
 
-### Rating
-- User votes (+1/-1) on workouts
-- Prevents duplicate voting
-- Updates workout statistics
+### 5. Gamification & Shop
+*   **Files**: `Views/ItemShopView.swift`, `Models/ShopModels.swift`, `Services/DailyTasksService.swift`
+*   **Functionality**:
+    *   **Tokens**: The virtual currency earned by receiving upvotes and completing daily tasks.
+    *   **Item Shop**: Users can purchase cosmetic items such as Profile Themes, Badges, Titles, and custom App Icons.
+    *   **Daily Tasks**: A rotating set of challenges (e.g., "Leave 3 comments", "Upload 1 workout") that reward engagement.
 
-### Comment
-- Text feedback on workouts
-- Like/dislike system
-- Moderation capabilities
+### 6. Nutrition & Progress
+*   **Files**: `Views/Nutrition/`, `Views/ProgressTrackerView.swift`, `Views/Nutrition/FoodDatabase.swift`
+*   **Functionality**:
+    *   **Calorie Calculator**: Estimates TDEE (Total Daily Energy Expenditure) based on user metrics.
+    *   **Meal Logger**: Tracks daily caloric and macronutrient intake.
+    *   **Food Database**: Integrates with the USDA FoodData Central API for accurate nutritional information.
+    *   **Progress Tracker**: Visualizes weight trends and calorie adherence over time, supporting both "Cutting" and "Bulking" goals.
 
-## Firebase Schema
+### 7. Leaderboards & Gyms
+*   **Files**: `Views/LeaderboardView.swift`, `Repositories/GymRepository.swift`
+*   **Functionality**:
+    *   **Global Leaderboard**: Ranks users by total tokens.
+    *   **Gym Leaderboards**: Tracks "Gym Champions" for specific lifts (Bench, Squat, Deadlift) at physical gym locations.
+    *   **Cloud Functions**: Automatically update gym records when a new personal best is verified.
 
-### Collections
-- `/users/{userId}` - User profiles and settings
-- `/workouts/{workoutId}` - Workout videos and metadata
-- `/ratings/{ratingId}` - User ratings on workouts
-- `/comments/{commentId}` - Comments on workouts
-- `/gyms/{gymId}` - Gym locations and records
-- `/reports/{reportId}` - Content moderation reports
+## Backend Logic (Cloud Functions)
 
-### Security Rules
-- Users can only modify their own data
-- Public read access for published content
-- Coach/admin privileges for moderation
-- Rate limiting and validation rules
+The `Firebase/functions/index.js` file contains critical server-side logic:
 
-## Cloud Functions
+1.  **`flagLift`**: Monitors workout updates. If a video receives >100 views and has a downvote ratio >40%, it is automatically flagged for review.
+2.  **`updateWorkoutVotes`**: Aggregates individual ratings from the `ratings` collection to update the summary counts on the `workout` document.
+3.  **`grantTokens`**: Triggers on positive ratings. When a user receives an upvote, they are awarded 10 tokens.
+4.  **`weeklyLeaderboardSnapshot`**: A scheduled job (Cron) that runs every Sunday to archive the current leaderboard state.
+5.  **`updateGymChampion`**: Checks if a newly uploaded lift exceeds the current gym record for that lift type. If so, it updates the gym's "Best Lift" record.
+6.  **`notifyAdminsOfReport`**: Listens for new documents in the `reports` collection to trigger administrative alerts.
 
-### Automated Workflows
-- **Content Moderation**: Flag workouts with >40% downvotes after 100 views
-- **Token Distribution**: Award tokens for positive engagement
-- **Leaderboard Snapshots**: Weekly leaderboard calculations
-- **Gym Champions**: Update gym records for new personal bests
+## Security Rules (Firestore)
 
-## Setup Instructions
+Access control is enforced via `firestore.rules`:
+*   **Users**: Can only read/write their own profile data.
+*   **Workouts**: Publicly readable. Creation requires authentication. Deletion is restricted to the owner or a coach.
+*   **Ratings**: Users can create ratings but cannot modify them (preventing vote manipulation).
+*   **Reports**: Only coaches can view reports. Any authenticated user can create a report.
+*   **Gyms**: Only coaches can manage gym locations.
 
-### Prerequisites
-- Xcode 15.0+
-- iOS 18.5+ deployment target
-- Swift 5.8.1+
-- Firebase project with iOS app configured
+## Configuration
 
-### Installation
+### Environment Variables
+Sensitive configuration (API keys, R2 credentials) is managed via `Services/EnvironmentConfig.swift` which reads from a local `.env` file. This ensures secrets are not hardcoded in the repository.
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/FitRank.git
-   cd FitRank
-   ```
+### Dependencies
+*   **Firebase iOS SDK**: Core backend services (Auth, Firestore, Storage).
+*   **SDWebImage**: Efficient image loading and caching.
+*   **Cloudflare R2**: Object storage for video content.
 
-2. **Install Firebase dependencies**
-   - Add Firebase iOS SDK via Swift Package Manager
-   - Include: FirebaseAuth, FirebaseFirestore, FirebaseStorage, FirebaseFunctions
+## Related Repositories
 
-3. **Configure Firebase**
-   - Add `GoogleService-Info.plist` to the project
-   - Update Firebase configuration in `FitRankApp.swift`
+*   **Admin Website**: [FitRank-Website](https://github.com/nyitgtm/FitRank-Website) - The web-based admin portal for managing the FitRank platform.
 
-4. **Set up Cloud Functions**
-   ```bash
-   cd FitRank/Firebase/functions
-   npm install
-   firebase deploy --only functions
-   ```
+## Getting Started
 
-5. **Deploy Firestore Rules**
-   ```bash
-   firebase deploy --only firestore:rules
-   ```
-
-6. **Build and Run**
-   - Open `FitRank.xcodeproj` in Xcode
-   - Select target device/simulator
-   - Build and run the project
-
-### Required Permissions
-
-The app requires the following permissions (configured in `Info.plist`):
-
-- **Camera**: Video recording for workouts
-- **Microphone**: Audio recording in videos
-- **Location**: GPS tagging for gym locations
-- **Photo Library**: Saving recorded videos
-
-## Development Guidelines
-
-### Code Style
-- Follow SwiftUI best practices
-- Use MVVM architecture consistently
-- Implement proper error handling
-- Add inline documentation for complex logic
-
-### Testing
-- Unit tests for ViewModels
-- UI tests for critical user flows
-- Integration tests for Firebase operations
-
-### Performance
-- Implement lazy loading for large lists
-- Use Firebase offline persistence
-- Optimize video uploads and streaming
-- Cache frequently accessed data
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Implement your changes
-4. Add tests and documentation
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For questions and support:
-- Create an issue on GitHub
-- Check the Firebase documentation
-- Review SwiftUI and iOS development resources
-
-## Roadmap
-
-### Future Features
-- Push notifications for engagement
-- Advanced analytics and insights
-- Social features (following, sharing)
-- Integration with fitness trackers
-- AR workout form analysis
-- Multi-language support
+1.  **Prerequisites**: Xcode 15+, iOS 16+ Simulator/Device.
+2.  **Configuration**:
+    *   Ensure `GoogleService-Info.plist` is present in the root directory.
+    *   Create a `.env` file with the required R2 credentials (see `EnvironmentConfig.swift`).
+3.  **Installation**: Open `FitRank.xcodeproj` and let Swift Package Manager resolve dependencies.
+4.  **Running**: Select a target simulator and press Run (Cmd+R).
 
 ---
 
-**Built with ❤️ using SwiftUI and Firebase**
+*Note: This documentation reflects the current state of the codebase as of November 2025.*
